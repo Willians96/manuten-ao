@@ -201,6 +201,14 @@ export const upsertUser = mutation({
       .first();
 
     if (existing) {
+      // ── Promove a admin master se ainda não houver nenhum admin no sistema ──
+      const anyAdmin = await ctx.db
+        .query("users")
+        .withIndex("by_role", (q) => q.eq("role", "admin"))
+        .first();
+      const isOrphanUser = !anyAdmin;
+      const makeAdmin = isOrphanUser;
+
       await ctx.db.patch(existing._id, {
         name: args.name,
         email: args.email,
@@ -208,19 +216,25 @@ export const upsertUser = mutation({
         ...(args.nomeDeGuerra && { nomeDeGuerra: args.nomeDeGuerra }),
         ...(args.re && { re: args.re }),
         ...(args.secao && { secao: args.secao }),
+        ...(makeAdmin && { role: "admin", approved: true }),
       });
       return existing._id;
     } else {
+      // ── Primeiro acesso: vira admin master automaticamente ──
+      const totalUsers = await ctx.db.query("users").take(2);
+      const isFirstUser = totalUsers.length === 0;
+      const isAdminMaster = isFirstUser;
+
       const id = await ctx.db.insert("users", {
         clerkId: args.clerkId,
         email: args.email,
         name: args.name,
-        role: args.role ?? "solicitante",
+        role: isAdminMaster ? "admin" : (args.role ?? "solicitante"),
         graduacao: args.graduacao,
         nomeDeGuerra: args.nomeDeGuerra,
         re: args.re,
         secao: args.secao,
-        approved: false,
+        approved: isAdminMaster, // admin master já fica aprovado direto
         createdAt: Date.now(),
       });
       return id;

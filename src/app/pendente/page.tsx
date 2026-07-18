@@ -1,15 +1,16 @@
 "use client";
 import { useUser } from "@clerk/nextjs";
-import { useMutation } from "convex/react";
+import { useMutation, useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 export const dynamic = "force-dynamic";
 
 export default function PendentePage() {
   const { user, isLoaded } = useUser();
   const upsertUser = useMutation(api.mutations.upsertUser);
+  const me = useQuery(api.mutations.me);
   const router = useRouter();
 
   const [graduacao, setGraduacao] = useState("");
@@ -17,6 +18,15 @@ export default function PendentePage() {
   const [re, setRe] = useState("");
   const [secao, setSecao] = useState("");
   const [submitted, setSubmitted] = useState(false);
+
+  // Se já tem user aprovado e logado, redireciona
+  useEffect(() => {
+    if (!isLoaded || !me) return;
+    if (me.approved) {
+      if (me.role === "solicitante") router.replace("/solicitar");
+      else router.replace("/gestor");
+    }
+  }, [isLoaded, me, router]);
 
   if (!isLoaded) return null;
 
@@ -38,7 +48,37 @@ export default function PendentePage() {
     setSubmitted(true);
   }
 
-  if (submitted) {
+  // Após submit, mostra mensagem baseada no status do user
+  if (submitted || (me && !me.approved)) {
+    const isAdminMaster = me?.role === "admin" && me?.approved;
+
+    if (isAdminMaster) {
+      return (
+        <div style={{
+          minHeight: "100vh",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          background: "#f4f6f9"
+        }}>
+          <div className="card" style={{ textAlign: "center", maxWidth: 420 }}>
+            <div style={{ fontSize: 48, marginBottom: 16 }}>👑</div>
+            <h2 style={{ color: "#003882", marginBottom: 8 }}>Bem-vindo, Admin Master!</h2>
+            <p style={{ color: "#6b7280", fontSize: 14, marginBottom: 20 }}>
+              Você é o primeiro usuário do sistema.<br />
+              Acesso total liberado.
+            </p>
+            <button
+              className="btn btn-primary"
+              onClick={() => router.replace("/gestor")}
+            >
+              Acessar Painel de Gestão
+            </button>
+          </div>
+        </div>
+      );
+    }
+
     return (
       <div style={{
         minHeight: "100vh",
@@ -52,7 +92,7 @@ export default function PendentePage() {
           <h2 style={{ color: "#003882", marginBottom: 8 }}>Cadastro enviado!</h2>
           <p style={{ color: "#6b7280", fontSize: 14 }}>
             Seu perfil foi enviado para aprovação.<br />
-            Um gestor vai validar seus dados em breve.
+            Um gestor/admin vai validar seus dados em breve.
           </p>
         </div>
       </div>
@@ -71,7 +111,7 @@ export default function PendentePage() {
       <div className="card" style={{ maxWidth: 480, width: "100%" }}>
         <h2 style={{ color: "#003882", marginBottom: 4 }}>Complete seu perfil</h2>
         <p style={{ color: "#6b7280", fontSize: 13, marginBottom: 24 }}>
-          Preencha os dados abaixo para solicitar serviços de manutenção.
+          Preencha os dados abaixo para acessar o sistema.
         </p>
 
         <form onSubmit={handleSubmit}>
@@ -131,7 +171,7 @@ export default function PendentePage() {
           </div>
 
           <button type="submit" className="btn btn-primary" style={{ width: "100%", justifyContent: "center" }}>
-            Enviar para aprovação
+            Finalizar cadastro
           </button>
         </form>
       </div>
