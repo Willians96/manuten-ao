@@ -7,6 +7,28 @@ import { api } from "../../../convex/_generated/api";
 
 export const dynamic = "force-dynamic";
 
+// Mapeia URL → label legível
+const PATH_LABELS: Record<string, string> = {
+  "/gestor": "Dashboard",
+  "/gestor/aprovar": "Aprovar Usuários",
+  "/gestor/equipes": "Equipes",
+  "/tecnico": "Meus Serviços",
+  "/solicitar": "Solicitar Serviço",
+};
+
+function getBreadcrumbs(pathname: string) {
+  const segments = pathname.split("/").filter(Boolean);
+  const crumbs: { href: string; label: string; icon: string }[] = [];
+  let path = "";
+  for (let i = 0; i < segments.length; i++) {
+    path += "/" + segments[i];
+    const label = PATH_LABELS[path] || segments[i];
+    const icon = i === 0 ? "🏠" : "›";
+    crumbs.push({ href: path, label, icon });
+  }
+  return crumbs;
+}
+
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
@@ -25,14 +47,20 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   const visibleLinks = links.filter((l) => l.roles.includes(role));
 
-  // Sempre volta pra raiz (/) que redireciona pro dashboard certo via RoleRouter
-  const homePath = "/";
-
-  // Destino do dashboard baseado no role (pra brasão da sidebar)
+  // Destino do dashboard baseado no role
   const dashboardPath =
     role === "gestor" || role === "admin" ? "/gestor" :
     role === "tecnico" ? "/tecnico" :
     "/solicitar";
+
+  // Página pai (pra onde "Voltar" deve ir baseado no path)
+  const parentPath = (() => {
+    if (!pathname) return dashboardPath;
+    if (pathname.startsWith("/gestor/")) return "/gestor";
+    return dashboardPath;
+  })();
+
+  const breadcrumbs = getBreadcrumbs(pathname || "");
 
   return (
     <div style={{ display: "flex", minHeight: "100vh" }}>
@@ -93,45 +121,40 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
       {/* Main */}
       <main className="main-content">
-        {/* Barra de navegação topo */}
+        {/* ── Breadcrumbs + nav bar ── */}
         <div style={{
-          display: "flex", alignItems: "center", gap: 12,
+          display: "flex", alignItems: "center", gap: 10,
           marginBottom: 20, paddingBottom: 12,
           borderBottom: "1px solid #e2e8f0",
-          position: "sticky", top: 0, background: "#f4f6f9", zIndex: 10
+          flexWrap: "wrap"
         }}>
-          <button
-            onClick={() => router.push(dashboardPath)}
-            className="btn btn-primary"
-            style={{ fontSize: 13, padding: "6px 14px" }}
-            title="Ir para o Dashboard"
-          >
-            🏠 Dashboard
-          </button>
-          <button
-            onClick={() => {
-              try {
-                if (typeof window !== "undefined" && window.history.length > 1) {
-                  router.back();
-                } else {
-                  router.push(dashboardPath);
-                }
-              } catch {
-                router.push(dashboardPath);
-              }
-            }}
-            className="btn btn-outline"
-            style={{ fontSize: 13, padding: "6px 12px" }}
-            title="Voltar à página anterior"
-          >
-            ← Voltar
-          </button>
+          {/* Breadcrumbs */}
+          <nav aria-label="breadcrumb" style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 13, flexWrap: "wrap" }}>
+            {breadcrumbs.map((crumb, idx) => {
+              const isLast = idx === breadcrumbs.length - 1;
+              return (
+                <span key={crumb.href} style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+                  {idx > 0 && <span style={{ color: "#9ca3af" }}>›</span>}
+                  {isLast ? (
+                    <span style={{ fontWeight: 600, color: "#003882" }}>{crumb.label}</span>
+                  ) : (
+                    <Link href={crumb.href} style={{ color: "#003882", textDecoration: "none" }}>
+                      {idx === 0 ? "🏠 Início" : crumb.label}
+                    </Link>
+                  )}
+                </span>
+              );
+            })}
+          </nav>
+
+          {/* User info (direita) */}
           <div style={{ marginLeft: "auto", fontSize: 12, color: "#6b7280" }}>
             <strong style={{ color: "#003882" }}>{me?.nomeDeGuerra ?? "—"}</strong>
             {me?.graduacao && <> · {me.graduacao}</>}
             {me?.secao && <> · {me.secao}</>}
           </div>
         </div>
+
         {children}
       </main>
     </div>
