@@ -64,6 +64,7 @@ export default defineSchema({
       v.literal("pendente"),       // aguardando gestor aprovar
       v.literal("aprovado"),       // aprovado, aguardando execução
       v.literal("em_andamento"),   // técnico começou
+      v.literal("pausado"),        // pausado, pode ser transferido
       v.literal("concluido"),      // encerrado
       v.literal("cancelado")
     ),
@@ -87,6 +88,10 @@ export default defineSchema({
     // Datas de execução preenchidas pelo técnico no cadastro direto
     dataInicioExec: v.optional(v.string()), // "2026-07-18T14:00"
     dataFimExec: v.optional(v.string()),   // "2026-07-18T16:30"
+
+    // Pausa
+    motivoPausa: v.optional(v.string()),  // por que pausou
+    pausadoEm: v.optional(v.number()),    // timestamp da pausa
 
     createdAt: v.number(),
     updatedAt: v.optional(v.number()),

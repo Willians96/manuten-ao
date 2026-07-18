@@ -5,18 +5,14 @@ import { SignedIn, SignOutButton, useUser } from "@clerk/nextjs";
 import { useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
 
-export default function DashboardLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const { user } = useUser();
   const me = useQuery(api.mutations.me);
 
   const role = me?.role ?? "solicitante";
 
-  const links: { href: string; label: string; icon: string; roles: string[] }[] = [
+  const links = [
     { href: "/gestor", label: "Dashboard", icon: "📊", roles: ["gestor", "admin"] },
     { href: "/gestor/aprovar", label: "Aprovar Usuários", icon: "👥", roles: ["gestor", "admin"] },
     { href: "/gestor/equipes", label: "Equipes", icon: "🔧", roles: ["gestor", "admin"] },
@@ -31,7 +27,13 @@ export default function DashboardLayout({
     <div style={{ display: "flex", minHeight: "100vh" }}>
       {/* Sidebar */}
       <aside className="sidebar">
-        <div className="logo">🔧 Manutenção</div>
+        <div className="logo-area">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/escudo.png" alt="CPI-7" onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
+          <div className="system-name">Manutenção CPI-7</div>
+          <div className="org-name">Polícia Militar de São Paulo</div>
+        </div>
+
         <nav>
           {visibleLinks.map((link) => (
             <Link
@@ -44,11 +46,11 @@ export default function DashboardLayout({
           ))}
         </nav>
 
-        <div style={{ marginTop: "auto", paddingTop: 24, borderTop: "1px solid rgba(255,255,255,0.15)" }}>
+        <div className="sidebar-footer">
           <div style={{ fontSize: 12, opacity: 0.7, marginBottom: 8 }}>
             {me?.nomeDeGuerra ?? user?.firstName ?? ""}
             <br />
-            <span style={{ textTransform: "uppercase" }}>{role}</span>
+            <span style={{ textTransform: "uppercase", fontSize: 10, color: "var(--pm-yellow)" }}>{role}</span>
           </div>
           <SignOutButton>
             <button className="btn" style={{
@@ -56,9 +58,10 @@ export default function DashboardLayout({
               color: "#fff",
               width: "100%",
               justifyContent: "center",
-              fontSize: 13
+              fontSize: 13,
+              padding: "8px"
             }}>
-              Sair
+              🚪 Sair
             </button>
           </SignOutButton>
         </div>

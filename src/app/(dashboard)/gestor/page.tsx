@@ -46,8 +46,12 @@ export default function GestorPage() {
           <div className="label">Pendentes</div>
         </div>
         <div className="stat-card">
-          <div className="value" style={{ color: "#166534" }}>{stats.emAndamento}</div>
+          <div className="value" style={{ color: "#c2410c" }}>{stats.emAndamento}</div>
           <div className="label">Em Andamento</div>
+        </div>
+        <div className="stat-card">
+          <div className="value" style={{ color: "#c2410c" }}>{stats.pausado}</div>
+          <div className="label">Pausados</div>
         </div>
         <div className="stat-card">
           <div className="value" style={{ color: "#003882" }}>{stats.concluido}</div>
@@ -62,14 +66,15 @@ export default function GestorPage() {
       {/* Por Equipe */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 12, marginBottom: 24 }}>
         {stats.equipes.map((eq: any) => {
-          const s = stats.porEquipe[eq._id] ?? { total: 0, concluido: 0, emAndamento: 0 };
+          const s = stats.porEquipe[eq._id] ?? { total: 0, concluido: 0, emAndamento: 0, pausado: 0 };
           return (
             <div key={eq._id} className="card">
               <div style={{ fontWeight: 700, marginBottom: 8 }}>{eq.nome}</div>
               <div style={{ fontSize: 13, color: "#6b7280" }}>
                 Total: <strong>{s.total}</strong> &nbsp;
                 Concluídos: <strong style={{ color: "#166534" }}>{s.concluido}</strong> &nbsp;
-                Em Andamento: <strong style={{ color: "#92400e" }}>{s.emAndamento}</strong>
+                Em Andamento: <strong style={{ color: "#c2410c" }}>{s.emAndamento}</strong> &nbsp;
+                Pausados: <strong style={{ color: "#c2410c" }}>{s.pausado}</strong>
               </div>
             </div>
           );
@@ -78,7 +83,7 @@ export default function GestorPage() {
 
       {/* Filtros */}
       <div style={{ display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap" }}>
-        {["todos","pendente","aprovado","em_andamento","concluido","cancelado"].map((f) => (
+        {["todos","pendente","aprovado","em_andamento","pausado","concluido","cancelado"].map((f) => (
           <button
             key={f}
             onClick={() => setFiltro(f)}
@@ -154,10 +159,24 @@ export default function GestorPage() {
                         Atribuir
                       </button>
                     )}
+                    {s.status === "pausado" && (
+                      <button
+                        className="btn btn-primary"
+                        style={{ fontSize: 12, padding: "4px 10px", background: "#c2410c" }}
+                        onClick={() => setModalAtr(s)}
+                      >
+                        🔄 Transferir
+                      </button>
+                    )}
                     {s.cadastroDireto && (
                       <span style={{ fontSize: 11, color: "#003882" }}>⚡direto</span>
                     )}
-                    {s.status !== "pendente" && !s.cadastroDireto && (
+                    {s.motivoPausa && (
+                      <div style={{ fontSize: 11, color: "#9a3412", marginTop: 4 }}>
+                        ⏸ {s.motivoPausa}
+                      </div>
+                    )}
+                    {s.status !== "pendente" && s.status !== "pausado" && !s.cadastroDireto && (
                       <span style={{ fontSize: 12, color: "#6b7280" }}>—</span>
                     )}
                   </td>
@@ -183,7 +202,15 @@ export default function GestorPage() {
           zIndex: 100, padding: 16
         }}>
           <div className="card" style={{ maxWidth: 440, width: "100%" }}>
-            <h3 style={{ marginBottom: 16 }}>Atribuir Serviço</h3>
+            <h3 style={{ marginBottom: 16 }}>
+              {modalAtr.status === "pausado" ? "🔄 Transferir Serviço Pausado" : "Atribuir Serviço"}
+            </h3>
+            {modalAtr.status === "pausado" && (
+              <div style={{ background: "#fff7ed", border: "1px solid #fed7aa", padding: "10px 14px", borderRadius: 8, marginBottom: 16, fontSize: 13, color: "#9a3412" }}>
+                ⏸ Motivo da pausa: <strong>{modalAtr.motivoPausa ?? "Não informado"}</strong>
+                <br />O serviço será transferido para a nova equipe assumir.
+              </div>
+            )}
             <p style={{ fontSize: 13, color: "#6b7280", marginBottom: 16 }}>
               <strong>{modalAtr.titulo}</strong><br />{modalAtr.local}
             </p>

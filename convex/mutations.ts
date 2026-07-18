@@ -53,7 +53,7 @@ export const listServicos = query({
         return servicos.filter(
           (s) =>
             s.equipeId === tecnico.equipeId &&
-            (s.status === "aprovado" || s.status === "em_andamento")
+            (s.status === "aprovado" || s.status === "em_andamento" || s.status === "pausado")
         );
       }
       return [];
@@ -99,9 +99,9 @@ export const dashboardStats = query({
     const equipes = await ctx.db.query("equipes").collect();
 
     // Conta por equipe
-    const porEquipe: Record<string, { total: number; concluido: number; emAndamento: number }> = {};
+    const porEquipe: Record<string, { total: number; concluido: number; emAndamento: number; pausado: number }> = {};
     for (const eq of equipes) {
-      porEquipe[eq._id] = { total: 0, concluido: 0, emAndamento: 0 };
+      porEquipe[eq._id] = { total: 0, concluido: 0, emAndamento: 0, pausado: 0 };
     }
 
     for (const s of servicos) {
@@ -109,6 +109,7 @@ export const dashboardStats = query({
         porEquipe[s.equipeId].total++;
         if (s.status === "concluido") porEquipe[s.equipeId].concluido++;
         if (s.status === "em_andamento") porEquipe[s.equipeId].emAndamento++;
+        if (s.status === "pausado") porEquipe[s.equipeId].pausado++;
       }
     }
 
@@ -148,6 +149,7 @@ export const dashboardStats = query({
       total: servicos.length,
       pendente: servicos.filter((s) => s.status === "pendente").length,
       emAndamento: servicos.filter((s) => s.status === "em_andamento").length,
+      pausado: servicos.filter((s) => s.status === "pausado").length,
       concluido: servicos.filter((s) => s.status === "concluido").length,
       porEquipe,
       equipes,
@@ -299,12 +301,107 @@ export const atribuirServico = mutation({
       throw new Error("Não autorizado");
     }
 
+    const servico = await ctx.db.get(args.servicoId);
+    if (!servico) throw new Error("Serviço não encontrado");
+
+    // Se estava pausado, mantém pausado (equipe nova vai retomar)
+    // Se era pendente, volta pra aprovado
+    const novoStatus = servico.status === "pausado" ? "pausado" : "aprovado";
+
     await ctx.db.patch(args.servicoId, {
       equipeId: args.equipeId,
       dataAgendada: args.dataAgendada,
       observacaoGestor: args.observacao,
-      status: "aprovado",
+      status: novoStatus as any,
       updatedAt: Date.now(),
+    });
+  },
+});
+
+export const pausarServico = mutation({
+  args: {
+    servicoId: v.id("servicos"),
+    motivo: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const userId = await getCurrentUserId();
+    if (!userId) throw new Error("Não autenticado");
+
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_clerkId", (q) => q.eq("clerkId", userId))
+      .first();
+
+    if (!user || user.role !== "tecnico") throw new Error("Não autorizado");
+
+    const tecnico = await ctx.db
+      .query("tecnicos")
+      .withIndex("by_user", (q) => q.eq("userId", user._id))
+      .first();
+
+    if (!tecnico) throw new Error("Técnico não cadastrado");
+
+    const servico = await ctx.db.get(args.servicoId);
+    if (!servico || servico.equipeId !== tecnico.equipeId) {
+      throw new Error("Serviço não pertence à sua equipe");
+    }
+
+    await ctx.db.patch(args.servicoId, {
+      status: "pausado",
+      motivoPausa: args.motivo,
+      pausadoEm: Date.now(),
+      updatedAt: Date.now(),
+    });
+
+    await ctx.db.insert("serviceLogs", {
+      servicoId: args.servicoId,
+      tecnicoId: tecnico._id,
+      acao: "observacao",
+      observacao: `⏸ Pausado: ${args.motivo}`,
+      createdAt: Date.now(),
+    });
+  },
+});
+
+export const retomarServico = mutation({
+  args: { servicoId: v.id("servicos") },
+  handler: async (ctx, args) => {
+    const userId = await getCurrentUserId();
+    if (!userId) throw new Error("Não autenticado");
+
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_clerkId", (q) => q.eq("clerkId", userId))
+      .first();
+
+    if (!user || user.role !== "tecnico") throw new Error("Não autorizado");
+
+    const tecnico = await ctx.db
+      .query("tecnicos")
+      .withIndex("by_user", (q) => q.eq("userId", user._id))
+      .first();
+
+    if (!tecnico) throw new Error("Técnico não cadastrado");
+
+    const servico = await ctx.db.get(args.servicoId);
+    if (!servico) throw new Error("Serviço não encontrado");
+
+    // Pode retomar se: (a) era da equipe original, ou (b) foi reassignado pra esta equipe
+    if (servico.equipeId !== tecnico.equipeId) {
+      throw new Error("Serviço não pertence à sua equipe");
+    }
+
+    await ctx.db.patch(args.servicoId, {
+      status: "em_andamento",
+      updatedAt: Date.now(),
+    });
+
+    await ctx.db.insert("serviceLogs", {
+      servicoId: args.servicoId,
+      tecnicoId: tecnico._id,
+      acao: "inicio",
+      observacao: "▶️ Retomado",
+      createdAt: Date.now(),
     });
   },
 });
