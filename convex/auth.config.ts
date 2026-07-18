@@ -1,8 +1,9 @@
 export default {
   providers: [
     {
-      // Clerk issuer
-      domain: "https://becoming-serval-20.clerk.accounts.dev",
+      // Clerk Frontend API URL (issuer) - from env var
+      domain: process.env.CLERK_JWT_ISSUER_DOMAIN!,
+      // Application ID = audience expected in the JWT (matches Clerk JWT template name)
       applicationID: "convex",
     },
   ],
