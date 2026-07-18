@@ -25,8 +25,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   const visibleLinks = links.filter((l) => l.roles.includes(role));
 
-  // Página "inicial" baseada no role (pra onde o botão 🏠 leva)
-  const homePath =
+  // Sempre volta pra raiz (/) que redireciona pro dashboard certo via RoleRouter
+  const homePath = "/";
+
+  // Destino do dashboard baseado no role (pra brasão da sidebar)
+  const dashboardPath =
     role === "gestor" || role === "admin" ? "/gestor" :
     role === "tecnico" ? "/tecnico" :
     "/solicitar";
@@ -35,7 +38,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     <div style={{ display: "flex", minHeight: "100vh" }}>
       {/* Sidebar */}
       <aside className="sidebar">
-        <Link href={homePath} className="logo-area" style={{ textDecoration: "none", color: "inherit" }}>
+        <Link href={dashboardPath} className="logo-area" style={{ textDecoration: "none", color: "inherit" }}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/escudo.png" alt="CPI-7" onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
           <div className="system-name">Manutenção CPI-7</div>
@@ -60,7 +63,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             <br />
             <span style={{ textTransform: "uppercase", fontSize: 10, color: "var(--pm-yellow)" }}>{role}</span>
           </div>
-          <Link href={homePath} className="btn" style={{
+          <Link href={dashboardPath} className="btn" style={{
             background: "rgba(255,255,255,0.1)",
             color: "#fff",
             width: "100%",
@@ -94,12 +97,28 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         <div style={{
           display: "flex", alignItems: "center", gap: 12,
           marginBottom: 20, paddingBottom: 12,
-          borderBottom: "1px solid #e2e8f0"
+          borderBottom: "1px solid #e2e8f0",
+          position: "sticky", top: 0, background: "#f4f6f9", zIndex: 10
         }}>
           <button
+            onClick={() => router.push(dashboardPath)}
+            className="btn btn-primary"
+            style={{ fontSize: 13, padding: "6px 14px" }}
+            title="Ir para o Dashboard"
+          >
+            🏠 Dashboard
+          </button>
+          <button
             onClick={() => {
-              if (window.history.length > 1) router.back();
-              else router.push(homePath);
+              try {
+                if (typeof window !== "undefined" && window.history.length > 1) {
+                  router.back();
+                } else {
+                  router.push(dashboardPath);
+                }
+              } catch {
+                router.push(dashboardPath);
+              }
             }}
             className="btn btn-outline"
             style={{ fontSize: 13, padding: "6px 12px" }}
@@ -107,12 +126,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           >
             ← Voltar
           </button>
-          <Link href={homePath} className="btn btn-outline" style={{
-            fontSize: 13, padding: "6px 12px",
-            textDecoration: "none"
-          }}>
-            🏠 Início
-          </Link>
           <div style={{ marginLeft: "auto", fontSize: 12, color: "#6b7280" }}>
             <strong style={{ color: "#003882" }}>{me?.nomeDeGuerra ?? "—"}</strong>
             {me?.graduacao && <> · {me.graduacao}</>}
