@@ -644,3 +644,40 @@ export const cadastrarTecnico = mutation({
     });
   },
 });
+
+// -- Debug / Fix account -----------------------------------------------------
+export const anyAdminExists = query({
+  args: {},
+  handler: async (ctx) => {
+    const admin = await ctx.db
+      .query("users")
+      .withIndex("by_role", (q) => q.eq("role", "admin"))
+      .first();
+    return { exists: !!admin, admin };
+  },
+});
+
+export const listAllUsers = query({
+  args: {},
+  handler: async (ctx) => {
+    return await ctx.db.query("users").collect();
+  },
+});
+
+export const forceAdminMaster = mutation({
+  args: {},
+  handler: async (ctx) => {
+    const userId = await getCurrentUserId(ctx);
+    if (!userId) throw new Error("Não autenticado");
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_clerkId", (q) => q.eq("clerkId", userId))
+      .first();
+    if (!user) throw new Error("User não existe no banco. Preencha o perfil em /pendente primeiro.");
+    await ctx.db.patch(user._id, {
+      role: "admin",
+      approved: true,
+    });
+    return { ok: true, newRole: "admin" };
+  },
+});
