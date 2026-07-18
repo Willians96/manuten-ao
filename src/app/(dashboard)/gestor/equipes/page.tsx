@@ -1,11 +1,13 @@
 "use client";
 import { useQuery, useMutation } from "convex/react";
-import { api } from "../../../convex/_generated/api";
+import { api } from "../../../../../convex/_generated/api";
 import { useState } from "react";
+
+export const dynamic = "force-dynamic";
 
 export default function EquipesPage() {
   const equipes = useQuery(api.mutations.listEquipes);
-  const tecnicos = useQuery(api.mutations.listTecnicos);
+  const tecnicos = useQuery(api.mutations.listTecnicos, {});
   const criarEquipe = useMutation(api.mutations.criarEquipe);
   const cadastrarTecnico = useMutation(api.mutations.cadastrarTecnico);
 

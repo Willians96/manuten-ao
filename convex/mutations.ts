@@ -1,4 +1,5 @@
 import { v } from "convex/values";
+import { Id } from "./_generated/dataModel";
 import { mutation, query } from "./_generated/server";
 import { getCurrentUserId } from "./auth";
 
@@ -7,7 +8,7 @@ import { getCurrentUserId } from "./auth";
 export const me = query({
   args: {},
   handler: async (ctx) => {
-    const userId = await getCurrentUserId();
+    const userId = await getCurrentUserId(ctx);
     if (!userId) return null;
     return await ctx.db
       .query("users")
@@ -21,7 +22,7 @@ export const listServicos = query({
     status: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    const currentUserId = await getCurrentUserId();
+    const currentUserId = await getCurrentUserId(ctx);
     if (!currentUserId) return [];
 
     const user = await ctx.db
@@ -31,13 +32,13 @@ export const listServicos = query({
 
     if (!user) return [];
 
-    let q = ctx.db.query("servicos").orderBy("createdAt");
+    let q = ctx.db.query("servicos").order("desc");
 
     if (args.status) {
       q = ctx.db
         .query("servicos")
         .withIndex("by_status", (q) => q.eq("status", args.status as any))
-        .orderBy("createdAt");
+        .order("desc");
     }
 
     const servicos = await q.collect();
@@ -66,13 +67,10 @@ export const listServicos = query({
 export const listTecnicos = query({
   args: { equipeId: v.optional(v.id("equipes")) },
   handler: async (ctx, args) => {
-    let q = ctx.db.query("tecnicos");
-    if (args.equipeId) {
-      q = ctx.db
-        .query("tecnicos")
-        .withIndex("by_equipe", (q) => q.eq("equipeId", args.equipeId));
-    }
-    const tecnicos = await q.collect();
+    const tecnicos = await (args.equipeId
+      ? ctx.db.query("tecnicos").withIndex("by_equipe", (q) => q.eq("equipeId", args.equipeId as Id<"equipes">))
+      : ctx.db.query("tecnicos")
+    ).collect();
     // Traz user info
     const withUser = await Promise.all(
       tecnicos.map(async (t) => ({
@@ -161,7 +159,7 @@ export const dashboardStats = query({
 export const pendingUsers = query({
   args: {},
   handler: async (ctx) => {
-    const currentUserId = await getCurrentUserId();
+    const currentUserId = await getCurrentUserId(ctx);
     if (!currentUserId) return [];
     const user = await ctx.db
       .query("users")
@@ -233,7 +231,7 @@ export const upsertUser = mutation({
 export const approveUser = mutation({
   args: { userId: v.id("users") },
   handler: async (ctx, args) => {
-    const currentUserId = await getCurrentUserId();
+    const currentUserId = await getCurrentUserId(ctx);
     if (!currentUserId) throw new Error("Não autenticado");
     const user = await ctx.db
       .query("users")
@@ -259,7 +257,7 @@ export const criarServico = mutation({
     ),
   },
   handler: async (ctx, args) => {
-    const userId = await getCurrentUserId();
+    const userId = await getCurrentUserId(ctx);
     if (!userId) throw new Error("Não autenticado");
 
     const user = await ctx.db
@@ -289,7 +287,7 @@ export const atribuirServico = mutation({
     observacao: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    const userId = await getCurrentUserId();
+    const userId = await getCurrentUserId(ctx);
     if (!userId) throw new Error("Não autenticado");
 
     const user = await ctx.db
@@ -324,7 +322,7 @@ export const pausarServico = mutation({
     motivo: v.string(),
   },
   handler: async (ctx, args) => {
-    const userId = await getCurrentUserId();
+    const userId = await getCurrentUserId(ctx);
     if (!userId) throw new Error("Não autenticado");
 
     const user = await ctx.db
@@ -366,7 +364,7 @@ export const pausarServico = mutation({
 export const retomarServico = mutation({
   args: { servicoId: v.id("servicos") },
   handler: async (ctx, args) => {
-    const userId = await getCurrentUserId();
+    const userId = await getCurrentUserId(ctx);
     if (!userId) throw new Error("Não autenticado");
 
     const user = await ctx.db
@@ -409,7 +407,7 @@ export const retomarServico = mutation({
 export const iniciarServico = mutation({
   args: { servicoId: v.id("servicos") },
   handler: async (ctx, args) => {
-    const userId = await getCurrentUserId();
+    const userId = await getCurrentUserId(ctx);
     if (!userId) throw new Error("Não autenticado");
 
     const user = await ctx.db
@@ -452,7 +450,7 @@ export const encerrarServico = mutation({
     observacao: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    const userId = await getCurrentUserId();
+    const userId = await getCurrentUserId(ctx);
     if (!userId) throw new Error("Não autenticado");
 
     const user = await ctx.db
@@ -487,7 +485,7 @@ export const encerrarServico = mutation({
 export const criarEquipe = mutation({
   args: { nome: v.string() },
   handler: async (ctx, args) => {
-    const userId = await getCurrentUserId();
+    const userId = await getCurrentUserId(ctx);
     if (!userId) throw new Error("Não autenticado");
 
     const user = await ctx.db
@@ -529,7 +527,7 @@ export const criarServicoDireto = mutation({
     dataFimExec: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    const userId = await getCurrentUserId();
+    const userId = await getCurrentUserId(ctx);
     if (!userId) throw new Error("Não autenticado");
 
     const user = await ctx.db
@@ -606,7 +604,7 @@ export const cadastrarTecnico = mutation({
     re: v.string(),
   },
   handler: async (ctx, args) => {
-    const userId = await getCurrentUserId();
+    const userId = await getCurrentUserId(ctx);
     if (!userId) throw new Error("Não autenticado");
 
     const user = await ctx.db

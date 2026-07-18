@@ -1,9 +1,11 @@
 "use client";
+export const dynamic = "force-dynamic";
+
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { SignedIn, SignOutButton, useUser } from "@clerk/nextjs";
 import { useQuery } from "convex/react";
-import { api } from "../../convex/_generated/api";
+import { api } from "../../../convex/_generated/api";
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();

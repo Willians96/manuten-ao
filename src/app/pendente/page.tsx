@@ -1,9 +1,11 @@
 "use client";
 import { useUser } from "@clerk/nextjs";
 import { useMutation } from "convex/react";
-import { api } from "../../convex/_generated/api";
+import { api } from "../../../convex/_generated/api";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+
+export const dynamic = "force-dynamic";
 
 export default function PendentePage() {
   const { user, isLoaded } = useUser();

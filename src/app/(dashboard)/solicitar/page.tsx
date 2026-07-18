@@ -1,10 +1,12 @@
 "use client";
 import { useQuery, useMutation } from "convex/react";
-import { api } from "../../../convex/_generated/api";
+import { api } from "../../../../convex/_generated/api";
 import { useState } from "react";
 
+export const dynamic = "force-dynamic";
+
 export default function SolicitarPage() {
-  const meusServicos = useQuery(api.mutations.listServicos);
+  const meusServicos = useQuery(api.mutations.listServicos, {});
   const criar = useMutation(api.mutations.criarServico);
 
   const [titulo, setTitulo] = useState("");

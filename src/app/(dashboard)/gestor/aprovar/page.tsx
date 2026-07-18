@@ -1,6 +1,8 @@
 "use client";
 import { useQuery, useMutation } from "convex/react";
-import { api } from "../../../convex/_generated/api";
+import { api } from "../../../../../convex/_generated/api";
+
+export const dynamic = "force-dynamic";
 
 export default function AprovarPage() {
   const pendentes = useQuery(api.mutations.pendingUsers);

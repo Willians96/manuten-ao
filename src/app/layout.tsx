@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import { ClerkProvider } from "@clerk/nextjs";
+import { ConvexProvider } from "convex/react";
+import { ConvexClientProvider } from "./ConvexClientProvider";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -17,9 +19,11 @@ export default function RootLayout({
 }) {
   return (
     <ClerkProvider>
-      <html lang="pt-BR">
-        <body>{children}</body>
-      </html>
+      <ConvexClientProvider>
+        <html lang="pt-BR">
+          <body>{children}</body>
+        </html>
+      </ConvexClientProvider>
     </ClerkProvider>
   );
 }

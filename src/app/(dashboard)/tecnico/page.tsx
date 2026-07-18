@@ -1,10 +1,12 @@
 "use client";
 import { useQuery, useMutation } from "convex/react";
-import { api } from "../../../convex/_generated/api";
+import { api } from "../../../../convex/_generated/api";
 import { useState } from "react";
 
+export const dynamic = "force-dynamic";
+
 export default function TecnicoPage() {
-  const servicos = useQuery(api.mutations.listServicos);
+  const servicos = useQuery(api.mutations.listServicos, {});
   const equipes = useQuery(api.mutations.listEquipes);
   const iniciar = useMutation(api.mutations.iniciarServico);
   const encerrar = useMutation(api.mutations.encerrarServico);
@@ -202,8 +204,8 @@ export default function TecnicoPage() {
               key={s._id}
               servico={s}
               onIniciar={handleIniciar}
-              onEncerrar={(id) => setEncerrarObs(id)}
-              onPausar={(id) => setPausarServ(id)}
+              onEncerrar={(id: any) => setEncerrarObs(id)}
+              onPausar={(id: any) => setPausarServ(id)}
               showPausar
             />
           ))}

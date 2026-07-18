@@ -1,13 +1,15 @@
 "use client";
 import { useQuery, useMutation } from "convex/react";
-import { api } from "../../../convex/_generated/api";
+import { api } from "../../../../convex/_generated/api";
 import { useState } from "react";
+
+export const dynamic = "force-dynamic";
 
 export default function GestorPage() {
   const stats = useQuery(api.mutations.dashboardStats);
-  const servicos = useQuery(api.mutations.listServicos);
+  const servicos = useQuery(api.mutations.listServicos, {});
   const equipes = useQuery(api.mutations.listEquipes);
-  const tecnicos = useQuery(api.mutations.listTecnicos);
+  const tecnicos = useQuery(api.mutations.listTecnicos, {});
   const atribuir = useMutation(api.mutations.atribuirServico);
 
   const [filtro, setFiltro] = useState("todos");
@@ -220,11 +222,10 @@ export default function GestorPage() {
               <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 8, color: "#003882" }}>
                 👥 Técnicos por Equipe (visão rápida)
               </div>
-              {(tecnicos ?? []).reduce((acc: any[], t: any) => {
+              {(tecnicos ?? []).reduce<any[]>((acc, t) => {
                 const eq = stats.equipes.find((e: any) => e._id === t.equipeId);
-                acc.push({ tecnico: t, equipe: eq });
-                return acc;
-              }, [] as any[]).forEach((item: any) => (
+                return [...acc, { tecnico: t, equipe: eq }];
+              }, []).map((item: any) => (
                 <div key={item.tecnico._id} style={{ fontSize: 12, padding: "4px 0", borderBottom: "1px solid #f1f5f9" }}>
                   <strong>{item.equipe?.nome}</strong> — {item.tecnico.nomeDeGuerra} ({item.tecnico.graduacao})
                 </div>

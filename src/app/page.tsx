@@ -2,8 +2,10 @@
 import { useAuth, SignedIn, SignedOut, RedirectToSignIn } from "@clerk/nextjs";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { api } from "../convex/_generated/api";
+import { api } from "../../convex/_generated/api";
 import { useQuery } from "convex/react";
+
+export const dynamic = "force-dynamic";
 
 export default function HomePage() {
   return (
