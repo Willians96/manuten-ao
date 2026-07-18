@@ -55,7 +55,15 @@ function RoleRouter() {
   useEffect(() => { setMounted(true); }, []);
 
   useEffect(() => {
-    if (!mounted || !user) return;
+    if (!mounted) return;
+    console.log("[RoleRouter] state:", { mounted, user, userId });
+    if (user === undefined) return; // ainda carregando
+    if (user === null) {
+      // user NÃO está no banco → vai preencher perfil
+      router.replace("/pendente");
+      return;
+    }
+    console.log("[RoleRouter] user loaded:", { role: user.role, approved: user.approved });
     if (!user.approved) {
       router.replace("/pendente");
       return;
@@ -71,9 +79,18 @@ function RoleRouter() {
       default:
         router.replace("/solicitar");
     }
-  }, [mounted, user, router]);
+  }, [mounted, user, userId, router]);
 
   if (!mounted) return <div style={{ padding: 40, textAlign: "center" }}>Carregando...</div>;
 
-  return <div style={{ padding: 40, textAlign: "center" }}>Redirecionando...</div>;
+  // ── Debug visual: mostra o que está acontecendo ──
+  return (
+    <div style={{ padding: 40, fontFamily: "monospace", fontSize: 12 }}>
+      <div style={{ marginBottom: 8 }}>Redirecionando...</div>
+      <div style={{ background: "#f1f5f9", padding: 12, borderRadius: 6, marginTop: 16 }}>
+        <div><strong>userId (Clerk):</strong> {userId ?? <em>null</em>}</div>
+        <div><strong>user (Convex):</strong> {user === undefined ? <em>loading...</em> : user === null ? <em style={{color:"red"}}>NULL (não encontrado no banco)</em> : JSON.stringify({ role: user.role, approved: user.approved, nome: user.nomeDeGuerra })}</div>
+      </div>
+    </div>
+  );
 }
