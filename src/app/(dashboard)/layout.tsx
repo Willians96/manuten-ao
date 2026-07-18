@@ -18,13 +18,15 @@ const PATH_LABELS: Record<string, string> = {
 
 function getBreadcrumbs(pathname: string) {
   const segments = pathname.split("/").filter(Boolean);
-  const crumbs: { href: string; label: string; icon: string }[] = [];
+  const crumbs: { href: string; label: string; icon: string }[] = [
+    // sempre começa com Início (raiz) → o RoleRouter redireciona pro dashboard certo
+    { href: "/", label: "Início", icon: "🏠" },
+  ];
   let path = "";
   for (let i = 0; i < segments.length; i++) {
     path += "/" + segments[i];
     const label = PATH_LABELS[path] || segments[i];
-    const icon = i === 0 ? "🏠" : "›";
-    crumbs.push({ href: path, label, icon });
+    crumbs.push({ href: path, label, icon: "›" });
   }
   return crumbs;
 }
@@ -139,7 +141,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                     <span style={{ fontWeight: 600, color: "#003882" }}>{crumb.label}</span>
                   ) : (
                     <Link href={crumb.href} style={{ color: "#003882", textDecoration: "none" }}>
-                      {idx === 0 ? "🏠 Início" : crumb.label}
+                      {crumb.label}
                     </Link>
                   )}
                 </span>
