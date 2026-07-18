@@ -1,14 +1,15 @@
 "use client";
-export const dynamic = "force-dynamic";
-
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { SignedIn, SignOutButton, useUser } from "@clerk/nextjs";
 import { useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 
+export const dynamic = "force-dynamic";
+
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const router = useRouter();
   const { user } = useUser();
   const me = useQuery(api.mutations.me);
 
@@ -19,29 +20,34 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     { href: "/gestor/aprovar", label: "Aprovar Usuários", icon: "👥", roles: ["gestor", "admin"] },
     { href: "/gestor/equipes", label: "Equipes", icon: "🔧", roles: ["gestor", "admin"] },
     { href: "/tecnico", label: "Meus Serviços", icon: "📋", roles: ["tecnico"] },
-    { href: "/solicitar", label: "Solicitar Serviço", icon: "📝", roles: ["solicitante"] },
-    { href: "/solicitar", label: "Minhas Solicitações", icon: "📋", roles: ["solicitante"] },
+    { href: "/solicitar", label: "Solicitar / Minhas", icon: "📝", roles: ["solicitante"] },
   ];
 
   const visibleLinks = links.filter((l) => l.roles.includes(role));
+
+  // Página "inicial" baseada no role (pra onde o botão 🏠 leva)
+  const homePath =
+    role === "gestor" || role === "admin" ? "/gestor" :
+    role === "tecnico" ? "/tecnico" :
+    "/solicitar";
 
   return (
     <div style={{ display: "flex", minHeight: "100vh" }}>
       {/* Sidebar */}
       <aside className="sidebar">
-        <div className="logo-area">
+        <Link href={homePath} className="logo-area" style={{ textDecoration: "none", color: "inherit" }}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/escudo.png" alt="CPI-7" onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
           <div className="system-name">Manutenção CPI-7</div>
           <div className="org-name">Polícia Militar de São Paulo</div>
-        </div>
+        </Link>
 
         <nav>
           {visibleLinks.map((link) => (
             <Link
               key={link.href}
               href={link.href}
-              className={pathname === link.href || pathname.startsWith(link.href + "/") ? "active" : ""}
+              className={pathname === link.href || (pathname?.startsWith(link.href + "/")) ? "active" : ""}
             >
               <span>{link.icon}</span> {link.label}
             </Link>
@@ -54,14 +60,27 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             <br />
             <span style={{ textTransform: "uppercase", fontSize: 10, color: "var(--pm-yellow)" }}>{role}</span>
           </div>
+          <Link href={homePath} className="btn" style={{
+            background: "rgba(255,255,255,0.1)",
+            color: "#fff",
+            width: "100%",
+            justifyContent: "center",
+            fontSize: 13,
+            padding: "8px",
+            marginBottom: 6,
+            display: "inline-flex",
+            textDecoration: "none",
+          }}>
+            🏠 Início
+          </Link>
           <SignOutButton>
             <button className="btn" style={{
-              background: "rgba(255,255,255,0.1)",
-              color: "#fff",
+              background: "rgba(255,255,255,0.05)",
+              color: "rgba(255,255,255,0.7)",
               width: "100%",
               justifyContent: "center",
-              fontSize: 13,
-              padding: "8px"
+              fontSize: 12,
+              padding: "6px"
             }}>
               🚪 Sair
             </button>
@@ -71,6 +90,35 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
       {/* Main */}
       <main className="main-content">
+        {/* Barra de navegação topo */}
+        <div style={{
+          display: "flex", alignItems: "center", gap: 12,
+          marginBottom: 20, paddingBottom: 12,
+          borderBottom: "1px solid #e2e8f0"
+        }}>
+          <button
+            onClick={() => {
+              if (window.history.length > 1) router.back();
+              else router.push(homePath);
+            }}
+            className="btn btn-outline"
+            style={{ fontSize: 13, padding: "6px 12px" }}
+            title="Voltar à página anterior"
+          >
+            ← Voltar
+          </button>
+          <Link href={homePath} className="btn btn-outline" style={{
+            fontSize: 13, padding: "6px 12px",
+            textDecoration: "none"
+          }}>
+            🏠 Início
+          </Link>
+          <div style={{ marginLeft: "auto", fontSize: 12, color: "#6b7280" }}>
+            <strong style={{ color: "#003882" }}>{me?.nomeDeGuerra ?? "—"}</strong>
+            {me?.graduacao && <> · {me.graduacao}</>}
+            {me?.secao && <> · {me.secao}</>}
+          </div>
+        </div>
         {children}
       </main>
     </div>
