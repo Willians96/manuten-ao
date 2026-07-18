@@ -15,7 +15,6 @@
     "react-dom": "^19.0.0",
     "@clerk/nextjs": "^6.9.0",
     "convex": "^1.17.0",
-    "@convex-dev/auth": "^0.0.81",
     "recharts": "^2.15.0"
   },
   "devDependencies": {

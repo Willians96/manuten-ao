@@ -1,0 +1,7 @@
+CLERK
+
+Public key=pk_test_YmVjb21pbmctc2VydmFsLTIwLmNsZXJrLmFjY291bnRzLmRldiQ
+
+Secret keys=sk_test_yto7jkWjaKn6KE17g4zYl8Zq6aiik0xrX4Dapm10aJ
+
+

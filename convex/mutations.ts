@@ -21,9 +21,12 @@ export const listServicos = query({
     status: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
+    const currentUserId = await getCurrentUserId();
+    if (!currentUserId) return [];
+
     const user = await ctx.db
       .query("users")
-      .withIndex("by_clerkId", (q) => q.eq("clerkId", await getCurrentUserId()))
+      .withIndex("by_clerkId", (q) => q.eq("clerkId", currentUserId))
       .first();
 
     if (!user) return [];
@@ -156,9 +159,11 @@ export const dashboardStats = query({
 export const pendingUsers = query({
   args: {},
   handler: async (ctx) => {
+    const currentUserId = await getCurrentUserId();
+    if (!currentUserId) return [];
     const user = await ctx.db
       .query("users")
-      .withIndex("by_clerkId", (q) => q.eq("clerkId", await getCurrentUserId()))
+      .withIndex("by_clerkId", (q) => q.eq("clerkId", currentUserId))
       .first();
 
     if (!user || (user.role !== "gestor" && user.role !== "admin")) return [];
@@ -226,9 +231,11 @@ export const upsertUser = mutation({
 export const approveUser = mutation({
   args: { userId: v.id("users") },
   handler: async (ctx, args) => {
+    const currentUserId = await getCurrentUserId();
+    if (!currentUserId) throw new Error("Não autenticado");
     const user = await ctx.db
       .query("users")
-      .withIndex("by_clerkId", (q) => q.eq("clerkId", await getCurrentUserId()))
+      .withIndex("by_clerkId", (q) => q.eq("clerkId", currentUserId))
       .first();
     if (!user || (user.role !== "gestor" && user.role !== "admin")) {
       throw new Error("Não autorizado");
