@@ -11,8 +11,15 @@ export default function GestorPage() {
   const equipes = useQuery(api.mutations.listEquipes);
   const tecnicos = useQuery(api.mutations.listTecnicos, {});
   const atribuir = useMutation(api.mutations.atribuirServico);
+  const excluir = useMutation(api.mutations.excluirServico);
+  const cancelar = useMutation(api.mutations.cancelarServico);
+  const editar = useMutation(api.mutations.editarServico);
 
   const [filtro, setFiltro] = useState("todos");
+  const [editS, setEditS] = useState<any>(null);
+  const [editForm, setEditForm] = useState({
+    titulo: "", descricao: "", local: "", urgencia: "media"
+  });
   const [modalAtr, setModalAtr] = useState<any>(null);
 
   if (!stats) return <div className="page-container">Carregando...</div>;
@@ -31,6 +38,43 @@ export default function GestorPage() {
       observacao: fd.get("observacao") as string || undefined,
     });
     setModalAtr(null);
+  }
+
+  function openEdit(s: any) {
+    setEditS(s);
+    setEditForm({
+      titulo: s.titulo,
+      descricao: s.descricao ?? "",
+      local: s.local,
+      urgencia: s.urgencia,
+    });
+  }
+
+  async function handleEditServico(e: React.FormEvent) {
+    e.preventDefault();
+    if (!editS) return;
+    try {
+      await editar({
+        servicoId: editS._id,
+        titulo: editForm.titulo,
+        descricao: editForm.descricao,
+        local: editForm.local,
+        urgencia: editForm.urgencia as any,
+      });
+      setEditS(null);
+    } catch (e: any) { alert(e.message); }
+  }
+
+  async function handleCancelar(s: any) {
+    if (!confirm(`Cancelar o serviço "${s.titulo}"?`)) return;
+    try { await cancelar({ servicoId: s._id }); }
+    catch (e: any) { alert(e.message); }
+  }
+
+  async function handleExcluir(s: any) {
+    if (!confirm(`⚠️ EXCLUIR PERMANENTEMENTE o serviço "${s.titulo}"?\n\nIsso não pode ser desfeito!`)) return;
+    try { await excluir({ servicoId: s._id }); }
+    catch (e: any) { alert(e.message); }
   }
 
   return (
@@ -152,34 +196,59 @@ export default function GestorPage() {
                     )}
                   </td>
                   <td>
-                    {s.status === "pendente" && (
+                    <div style={{ display: "flex", gap: 4, flexWrap: "wrap", alignItems: "center" }}>
+                      {s.status === "pendente" && (
+                        <button
+                          className="btn btn-primary"
+                          style={{ fontSize: 11, padding: "3px 8px" }}
+                          onClick={() => setModalAtr(s)}
+                        >
+                          Atribuir
+                        </button>
+                      )}
+                      {s.status === "pausado" && (
+                        <button
+                          className="btn btn-primary"
+                          style={{ fontSize: 11, padding: "3px 8px", background: "#c2410c" }}
+                          onClick={() => setModalAtr(s)}
+                        >
+                          🔄 Transferir
+                        </button>
+                      )}
                       <button
-                        className="btn btn-primary"
-                        style={{ fontSize: 12, padding: "4px 10px" }}
-                        onClick={() => setModalAtr(s)}
+                        className="btn btn-outline"
+                        style={{ fontSize: 11, padding: "3px 8px" }}
+                        onClick={() => openEdit(s)}
+                        title="Editar dados do serviço"
                       >
-                        Atribuir
+                        ✏️
                       </button>
-                    )}
-                    {s.status === "pausado" && (
+                      {s.status !== "cancelado" && s.status !== "concluido" && (
+                        <button
+                          className="btn btn-outline"
+                          style={{ fontSize: 11, padding: "3px 8px", color: "#92400e", borderColor: "#fde68a" }}
+                          onClick={() => handleCancelar(s)}
+                          title="Cancelar (mantém no histórico)"
+                        >
+                          🚫
+                        </button>
+                      )}
                       <button
-                        className="btn btn-primary"
-                        style={{ fontSize: 12, padding: "4px 10px", background: "#c2410c" }}
-                        onClick={() => setModalAtr(s)}
+                        className="btn btn-outline"
+                        style={{ fontSize: 11, padding: "3px 8px", color: "#dc2626", borderColor: "#fecaca" }}
+                        onClick={() => handleExcluir(s)}
+                        title="Excluir permanentemente"
                       >
-                        🔄 Transferir
+                        🗑
                       </button>
-                    )}
+                    </div>
                     {s.cadastroDireto && (
-                      <span style={{ fontSize: 11, color: "#003882" }}>⚡direto</span>
+                      <span style={{ fontSize: 10, color: "#003882" }}>⚡direto</span>
                     )}
                     {s.motivoPausa && (
-                      <div style={{ fontSize: 11, color: "#9a3412", marginTop: 4 }}>
+                      <div style={{ fontSize: 10, color: "#9a3412", marginTop: 2 }}>
                         ⏸ {s.motivoPausa}
                       </div>
-                    )}
-                    {s.status !== "pendente" && s.status !== "pausado" && !s.cadastroDireto && (
-                      <span style={{ fontSize: 12, color: "#6b7280" }}>—</span>
                     )}
                   </td>
                 </tr>
@@ -253,6 +322,66 @@ export default function GestorPage() {
               <div style={{ display: "flex", gap: 8 }}>
                 <button type="submit" className="btn btn-success">Confirmar</button>
                 <button type="button" className="btn btn-outline" onClick={() => setModalAtr(null)}>Cancelar</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Editar */}
+      {editS && (
+        <div style={{
+          position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)",
+          display: "flex", alignItems: "center", justifyContent: "center",
+          zIndex: 100, padding: 16
+        }}>
+          <div className="card" style={{ maxWidth: 480, width: "100%" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+              <h3 style={{ margin: 0 }}>✏️ Editar Serviço</h3>
+              <button onClick={() => setEditS(null)} style={{ background: "none", border: "none", fontSize: 20, cursor: "pointer" }}>✕</button>
+            </div>
+            <form onSubmit={handleEditServico}>
+              <div className="form-group">
+                <label>Título</label>
+                <input
+                  type="text"
+                  value={editForm.titulo}
+                  onChange={(e) => setEditForm({ ...editForm, titulo: e.target.value })}
+                  required
+                />
+              </div>
+              <div className="form-group">
+                <label>Local</label>
+                <input
+                  type="text"
+                  value={editForm.local}
+                  onChange={(e) => setEditForm({ ...editForm, local: e.target.value })}
+                  required
+                />
+              </div>
+              <div className="form-group">
+                <label>Urgência</label>
+                <select
+                  value={editForm.urgencia}
+                  onChange={(e) => setEditForm({ ...editForm, urgencia: e.target.value })}
+                >
+                  <option value="baixa">Baixa</option>
+                  <option value="media">Média</option>
+                  <option value="alta">Alta</option>
+                  <option value="critica">Crítica</option>
+                </select>
+              </div>
+              <div className="form-group">
+                <label>Descrição</label>
+                <textarea
+                  rows={3}
+                  value={editForm.descricao}
+                  onChange={(e) => setEditForm({ ...editForm, descricao: e.target.value })}
+                />
+              </div>
+              <div style={{ display: "flex", gap: 8 }}>
+                <button type="submit" className="btn btn-primary">💾 Salvar</button>
+                <button type="button" className="btn btn-outline" onClick={() => setEditS(null)}>Cancelar</button>
               </div>
             </form>
           </div>

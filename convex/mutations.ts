@@ -822,3 +822,84 @@ export const excluirTecnico = mutation({
     return { ok: true, softDeleted: true };
   },
 });
+
+// -- Gestão de Serviços (admin/gestor) ---------------------------------------
+export const excluirServico = mutation({
+  args: { servicoId: v.id("servicos") },
+  handler: async (ctx, args) => {
+    const currentUserId = await getCurrentUserId(ctx);
+    if (!currentUserId) throw new Error("Não autenticado");
+    const currentUser = await ctx.db
+      .query("users")
+      .withIndex("by_clerkId", (q) => q.eq("clerkId", currentUserId))
+      .first();
+    if (!currentUser || (currentUser.role !== "gestor" && currentUser.role !== "admin")) {
+      throw new Error("Não autorizado");
+    }
+    // Apaga os logs relacionados
+    const logs = await ctx.db
+      .query("serviceLogs")
+      .withIndex("by_servico", (q) => q.eq("servicoId", args.servicoId))
+      .collect();
+    for (const log of logs) {
+      await ctx.db.delete(log._id);
+    }
+    // Apaga o serviço
+    await ctx.db.delete(args.servicoId);
+    return { ok: true };
+  },
+});
+
+export const cancelarServico = mutation({
+  args: { servicoId: v.id("servicos") },
+  handler: async (ctx, args) => {
+    const currentUserId = await getCurrentUserId(ctx);
+    if (!currentUserId) throw new Error("Não autenticado");
+    const currentUser = await ctx.db
+      .query("users")
+      .withIndex("by_clerkId", (q) => q.eq("clerkId", currentUserId))
+      .first();
+    if (!currentUser || (currentUser.role !== "gestor" && currentUser.role !== "admin")) {
+      throw new Error("Não autorizado");
+    }
+    await ctx.db.patch(args.servicoId, {
+      status: "cancelado",
+      updatedAt: Date.now(),
+    });
+    return { ok: true };
+  },
+});
+
+export const editarServico = mutation({
+  args: {
+    servicoId: v.id("servicos"),
+    titulo: v.string(),
+    descricao: v.string(),
+    local: v.string(),
+    urgencia: v.union(
+      v.literal("baixa"),
+      v.literal("media"),
+      v.literal("alta"),
+      v.literal("critica")
+    ),
+  },
+  handler: async (ctx, args) => {
+    const currentUserId = await getCurrentUserId(ctx);
+    if (!currentUserId) throw new Error("Não autenticado");
+    const currentUser = await ctx.db
+      .query("users")
+      .withIndex("by_clerkId", (q) => q.eq("clerkId", currentUserId))
+      .first();
+    if (!currentUser || (currentUser.role !== "gestor" && currentUser.role !== "admin")) {
+      throw new Error("Não autorizado");
+    }
+    await ctx.db.patch(args.servicoId, {
+      titulo: args.titulo,
+      descricao: args.descricao,
+      local: args.local,
+      urgencia: args.urgencia,
+      updatedAt: Date.now(),
+    });
+    return { ok: true };
+  },
+});
