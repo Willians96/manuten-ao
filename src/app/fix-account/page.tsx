@@ -83,6 +83,28 @@ export default function FixAccountPage() {
     <div style={{ padding: 24, fontFamily: "monospace", maxWidth: 900, margin: "0 auto" }}>
       <h2>🔧 Diagnóstico da Conta</h2>
 
+      {/* Status visual grande */}
+      <div style={{
+        marginTop: 16, padding: 20, borderRadius: 8,
+        background: me?.isAdminMaster ? "#d1fae5" : "#fee2e2",
+        border: me?.isAdminMaster ? "2px solid #16a34a" : "2px solid #dc2626",
+        textAlign: "center"
+      }}>
+        <div style={{ fontSize: 48, marginBottom: 8 }}>
+          {me?.isAdminMaster ? "👑" : "🚫"}
+        </div>
+        <div style={{ fontSize: 18, fontWeight: 700, color: me?.isAdminMaster ? "#065f46" : "#991b1b" }}>
+          {me?.isAdminMaster
+            ? "VOCÊ É ADMIN MASTER"
+            : "Você NÃO é Admin Master (isAdminMaster = false)"}
+        </div>
+        {me?.isAdminMaster && (
+          <div style={{ fontSize: 13, color: "#065f46", marginTop: 8 }}>
+            Pode excluir serviços permanentemente no dashboard.
+          </div>
+        )}
+      </div>
+
       <div style={{ marginTop: 16, padding: 12, background: "#f0f9ff", border: "1px solid #bae6fd", borderRadius: 8 }}>
         <strong>Clerk userId:</strong> <code>{user.id}</code><br />
         <strong>Email:</strong> {user.emailAddresses[0]?.emailAddress}<br />
