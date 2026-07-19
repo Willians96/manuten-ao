@@ -3,6 +3,7 @@
 import { useQuery } from "convex/react";
 import { api } from "../../../../../convex/_generated/api";
 import { useMemo } from "react";
+import * as XLSX from "xlsx";
 
 export const dynamic = "force-dynamic";
 
@@ -110,30 +111,102 @@ export default function RelatoriosPage() {
     return { meses, porTecnico, locaisOrdenados, porEquipeComData };
   }, [stats, servicos, equipes, tecnicos]);
 
-  function exportCSV() {
-    if (!servicos) return;
-    const rows = [
+  function exportXLSX() {
+    if (!servicos || !relatorio) return;
+    const wb = XLSX.utils.book_new();
+
+    // ── Aba 1: Resumo ──
+    const resumoData = [
+      ["Relatório de Manutenção — CPI-7"],
+      ["Gerado em", new Date().toLocaleString("pt-BR")],
+      [],
+      ["Indicador", "Valor"],
+      ["Total de Solicitações", stats?.total ?? 0],
+      ["Pendentes", stats?.pendente ?? 0],
+      ["Em Andamento", stats?.emAndamento ?? 0],
+      ["Pausados", stats?.pausado ?? 0],
+      ["Concluídos", stats?.concluido ?? 0],
+      ["Tempo Médio (min)", stats?.tempoMedioMin ?? 0],
+    ];
+    const wsResumo = XLSX.utils.aoa_to_sheet(resumoData);
+    wsResumo["!cols"] = [{ wch: 25 }, { wch: 20 }];
+    XLSX.utils.book_append_sheet(wb, wsResumo, "Resumo");
+
+    // ── Aba 2: Por Equipe ──
+    const porEquipeData: any[][] = [
+      ["Equipe", "Total", "Concluídos", "Em Andamento", "Pausados", "Taxa de Conclusão (%)"],
+    ];
+    (equipes ?? []).forEach((eq: any) => {
+      const s = stats?.porEquipe?.[eq._id] ?? { total: 0, concluido: 0, emAndamento: 0, pausado: 0 };
+      const taxa = s.total > 0 ? Math.round((s.concluido / s.total) * 100) : 0;
+      porEquipeData.push([eq.nome, s.total, s.concluido, s.emAndamento, s.pausado, taxa]);
+    });
+    const wsEquipe = XLSX.utils.aoa_to_sheet(porEquipeData);
+    wsEquipe["!cols"] = [{ wch: 20 }, { wch: 8 }, { wch: 12 }, { wch: 14 }, { wch: 10 }, { wch: 18 }];
+    XLSX.utils.book_append_sheet(wb, wsEquipe, "Por Equipe");
+
+    // ── Aba 3: Produtividade por Técnico ──
+    const porTecnicoData: any[][] = [
+      ["Técnico", "Total Atribuído", "Concluídos", "Tempo Médio (min)"],
+    ];
+    relatorio.porTecnico
+      .filter((t) => t.total > 0)
+      .sort((a, b) => b.concluido - a.concluido)
+      .forEach((t) => {
+        porTecnicoData.push([t.nome, t.total, t.concluido, t.duracaoMedia > 0 ? t.duracaoMedia : "—"]);
+      });
+    const wsTec = XLSX.utils.aoa_to_sheet(porTecnicoData);
+    wsTec["!cols"] = [{ wch: 25 }, { wch: 15 }, { wch: 12 }, { wch: 16 }];
+    XLSX.utils.book_append_sheet(wb, wsTec, "Por Tecnico");
+
+    // ── Aba 4: Serviços Realizados por Equipe (uma seção por equipe) ──
+    relatorio.porEquipeComData.forEach((grupo) => {
+      const data: any[][] = [
+        [`SERVIÇOS REALIZADOS — ${grupo.equipe.toUpperCase()}`],
+        [],
+        ["Data", "Serviço", "Local", "Técnico", "Duração (min)"],
+      ];
+      if (grupo.servicos.length === 0) {
+        data.push(["—", "Nenhum serviço concluído por esta equipe", "—", "—", "—"]);
+      } else {
+        grupo.servicos.forEach((s) => {
+          data.push([s.data, s.titulo, s.local, s.tecnico, s.duracao > 0 ? s.duracao : "—"]);
+        });
+      }
+      const ws = XLSX.utils.aoa_to_sheet(data);
+      ws["!cols"] = [{ wch: 12 }, { wch: 40 }, { wch: 25 }, { wch: 20 }, { wch: 14 }];
+      const sheetName = grupo.equipe.replace(/[^\w]/g, "").slice(0, 28) || "Equipe";
+      XLSX.utils.book_append_sheet(wb, ws, sheetName);
+    });
+
+    // ── Aba final: Todos os Serviços (lista completa) ──
+    const todosData: any[][] = [
       ["ID", "Título", "Local", "Urgência", "Status", "Equipe", "Cadastro", "Início Exec", "Fim Exec"],
-      ...servicos.map((s: any) => [
+    ];
+    servicos.forEach((s: any) => {
+      todosData.push([
         s._id.toString().slice(-6),
         s.titulo,
         s.local,
         s.urgencia,
         s.status,
-        s.equipeId ? (equipeNome(s.equipeId)) : "",
+        s.equipeId ? equipeNome(s.equipeId) : "",
         new Date(s._creationTime).toLocaleString("pt-BR"),
         s.dataInicioExec ?? "",
         s.dataFimExec ?? "",
-      ]),
-    ];
-    const csv = rows
-      .map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(","))
-      .join("\n");
-    const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8" });
+      ]);
+    });
+    const wsTodos = XLSX.utils.aoa_to_sheet(todosData);
+    wsTodos["!cols"] = [{ wch: 8 }, { wch: 40 }, { wch: 25 }, { wch: 12 }, { wch: 14 }, { wch: 18 }, { wch: 20 }, { wch: 18 }, { wch: 18 }];
+    XLSX.utils.book_append_sheet(wb, wsTodos, "Todos os Servicos");
+
+    // Gera e baixa o arquivo
+    const wbout = XLSX.write(wb, { bookType: "xlsx", type: "array" });
+    const blob = new Blob([wbout], { type: "application/octet-stream" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `relatorio-manutencao-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.download = `relatorio-manutencao-${new Date().toISOString().slice(0, 10)}.xlsx`;
     a.click();
     URL.revokeObjectURL(url);
   }
@@ -155,7 +228,7 @@ export default function RelatoriosPage() {
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20, flexWrap: "wrap", gap: 12 }}>
         <h1 className="page-title" style={{ margin: 0 }}>📊 Relatórios</h1>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-          <button onClick={exportCSV} className="btn btn-primary">📥 Exportar CSV</button>
+          <button onClick={exportXLSX} className="btn btn-primary">📥 Exportar Excel</button>
           <button onClick={printPage} className="btn btn-outline">🖨 Imprimir</button>
         </div>
       </div>
