@@ -44,6 +44,13 @@ export default defineSchema({
     nomeDeGuerra: v.string(),
     re: v.string(),
     ativo: v.boolean(),
+    status: v.optional(
+      v.union(
+        v.literal("ativo"),
+        v.literal("ferias"),
+        v.literal("baixa")
+      )
+    ), // status de trabalho: ativo (default), ferias ou baixa
     createdAt: v.number(),
   })
     .index("by_equipe", ["equipeId"])

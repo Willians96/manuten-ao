@@ -710,6 +710,7 @@ export const cadastrarTecnico = mutation({
       nomeDeGuerra: args.nomeDeGuerra,
       re: args.re,
       ativo: true,
+      status: "ativo" as const,
       createdAt: Date.now(),
     });
   },
@@ -754,6 +755,30 @@ export const forceAdminMaster = mutation({
 });
 
 // -- Editar / Excluir Tecnico ------------------------------------------------
+export const alterarStatusTecnico = mutation({
+  args: {
+    tecnicoId: v.id("tecnicos"),
+    status: v.union(
+      v.literal("ativo"),
+      v.literal("ferias"),
+      v.literal("baixa")
+    ),
+  },
+  handler: async (ctx, args) => {
+    const currentUserId = await getCurrentUserId(ctx);
+    if (!currentUserId) throw new Error("Nao autenticado");
+    const currentUser = await ctx.db
+      .query("users")
+      .withIndex("by_clerkId", (q) => q.eq("clerkId", currentUserId))
+      .first();
+    if (!currentUser || (currentUser.role !== "gestor" && currentUser.role !== "admin")) {
+      throw new Error("Nao autorizado");
+    }
+    await ctx.db.patch(args.tecnicoId, { status: args.status });
+    return { ok: true };
+  },
+});
+
 export const editarTecnico = mutation({
   args: {
     tecnicoId: v.id("tecnicos"),

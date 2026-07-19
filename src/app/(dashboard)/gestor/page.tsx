@@ -2,6 +2,7 @@
 import { useQuery, useMutation } from "convex/react";
 import { api } from "../../../../convex/_generated/api";
 import { useState } from "react";
+import Link from "next/link";
 
 export const dynamic = "force-dynamic";
 
@@ -82,7 +83,12 @@ export default function GestorPage() {
 
   return (
     <div className="page-container">
-      <h1 className="page-title">📊 Dashboard — Gestão de Manutenção {isAdminMaster && <span style={{ fontSize: 14, marginLeft: 12, background: "#f6d700", color: "#003882", padding: "4px 10px", borderRadius: 12, fontWeight: 700 }}>👑 Admin Master</span>}</h1>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16, gap: 12, flexWrap: "wrap" }}>
+        <h1 className="page-title" style={{ margin: 0 }}>📊 Dashboard — Gestão de Manutenção {isAdminMaster && <span style={{ fontSize: 14, marginLeft: 12, background: "#f6d700", color: "#003882", padding: "4px 10px", borderRadius: 12, fontWeight: 700 }}>👑 Admin Master</span>}</h1>
+        <Link href="/gestor/relatorios" className="btn btn-primary" style={{ whiteSpace: "nowrap" }}>
+          📈 Gerar Relatório
+        </Link>
+      </div>
 
       {/* Stats */}
       <div className="stat-grid">
@@ -296,7 +302,7 @@ export default function GestorPage() {
               <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 8, color: "#003882" }}>
                 👥 Técnicos por Equipe (visão rápida)
               </div>
-              {(tecnicos ?? []).filter((t: any) => t.ativo).reduce<any[]>((acc, t) => {
+              {(tecnicos ?? []).filter((t: any) => t.ativo && (t.status === "ativo" || !t.status)).reduce<any[]>((acc, t) => {
                 const eq = stats.equipes.find((e: any) => e._id === t.equipeId);
                 return [...acc, { tecnico: t, equipe: eq }];
               }, []).map((item: any) => (

@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "../../../../../convex/_generated/api";
 import { useState } from "react";
@@ -24,6 +24,7 @@ export default function EquipesPage() {
   const cadastrarTecnico = useMutation(api.mutations.cadastrarTecnico);
   const editarTecnico = useMutation(api.mutations.editarTecnico);
   const excluirTecnico = useMutation(api.mutations.excluirTecnico);
+  const alterarStatus = useMutation(api.mutations.alterarStatusTecnico);
 
   const [novaEquipe, setNovaEquipe] = useState("");
   const [showInativos, setShowInativos] = useState(false);
@@ -106,6 +107,19 @@ export default function EquipesPage() {
     } catch (e: any) { alert(e.message); }
   }
 
+  async function handleAlterarStatus(t: any, status: "ativo" | "ferias" | "baixa") {
+    try {
+      await alterarStatus({ tecnicoId: t._id as any, status });
+    } catch (e: any) { alert(e.message); }
+  }
+
+  function renderStatusBadge(status: string) {
+    const baseStyle: React.CSSProperties = { fontSize: 11, fontWeight: 600, padding: "3px 8px", borderRadius: 4 };
+    if (status === "ferias") return <span style={{ ...baseStyle, background: "#dbeafe", color: "#1e40af" }}>🏖 Férias</span>;
+    if (status === "baixa") return <span style={{ ...baseStyle, background: "#fee2e2", color: "#991b1b" }}>🏥 Baixa</span>;
+    return <span style={{ ...baseStyle, background: "#dcfce7", color: "#166534" }}>✅ Ativo</span>;
+  }
+
   return (
     <div className="page-container">
       <h1 className="page-title">🔧 Gerenciar Equipes</h1>
@@ -162,7 +176,8 @@ export default function EquipesPage() {
                   <th>Graduação</th>
                   <th>Nome de Guerra</th>
                   <th>RE</th>
-                  <th>Status</th>
+                  <th>Cadastro</th>
+                  <th>Status Trabalho</th>
                   <th>Ações</th>
                 </tr>
               </thead>
@@ -192,30 +207,23 @@ export default function EquipesPage() {
                         )}
                       </td>
                       <td>
-                        <div style={{ display: "flex", gap: 4 }}>
-                          <button
-                            className="btn btn-outline"
-                            style={{ fontSize: 11, padding: "3px 8px" }}
-                            onClick={() => openEdit(t)}
-                          >
-                            ✏️ Editar
-                          </button>
-                          {t.ativo ? (
-                            <button
-                              className="btn btn-danger"
-                              style={{ fontSize: 11, padding: "3px 8px" }}
-                              onClick={() => handleExcluir(t)}
-                            >
-                              🗑 Excluir
-                            </button>
+                        {renderStatusBadge(t.status || "ativo")}
+                      </td>
+                      <td>
+                        <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+                          {(t.status || "ativo") === "ativo" ? (
+                            <>
+                              <button className="btn btn-outline" style={{ fontSize: 10, padding: "2px 6px", color: "#1e40af", borderColor: "#bfdbfe" }} onClick={() => handleAlterarStatus(t, "ferias")} title="Marcar em ferias">🏖</button>
+                              <button className="btn btn-outline" style={{ fontSize: 10, padding: "2px 6px", color: "#991b1b", borderColor: "#fecaca" }} onClick={() => handleAlterarStatus(t, "baixa")} title="Marcar em baixa medica">🏥</button>
+                            </>
                           ) : (
-                            <button
-                              className="btn btn-success"
-                              style={{ fontSize: 11, padding: "3px 8px" }}
-                              onClick={() => handleReativar(t)}
-                            >
-                              ↻ Reativar
-                            </button>
+                            <button className="btn btn-success" style={{ fontSize: 10, padding: "2px 8px" }} onClick={() => handleAlterarStatus(t, "ativo")} title="Voltar (Ativar)">✅ Voltar</button>
+                          )}
+                          <button className="btn btn-outline" style={{ fontSize: 11, padding: "3px 8px" }} onClick={() => openEdit(t)} title="Editar">✏️</button>
+                          {t.ativo ? (
+                            <button className="btn btn-danger" style={{ fontSize: 11, padding: "3px 8px" }} onClick={() => handleExcluir(t)}>🗑</button>
+                          ) : (
+                            <button className="btn btn-success" style={{ fontSize: 11, padding: "3px 8px" }} onClick={() => handleReativar(t)}>↻</button>
                           )}
                         </div>
                       </td>
@@ -224,7 +232,7 @@ export default function EquipesPage() {
                 })}
                 {tecnicosEq.length === 0 && (
                   <tr>
-                    <td colSpan={5} style={{ textAlign: "center", color: "#6b7280", fontSize: 13 }}>
+                    <td colSpan={6} style={{ textAlign: "center", color: "#6b7280", fontSize: 13 }}>
                       Nenhum técnico {showInativos ? "" : "ativo"} nesta equipe.
                     </td>
                   </tr>

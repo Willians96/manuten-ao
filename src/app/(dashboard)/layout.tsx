@@ -10,6 +10,7 @@ export const dynamic = "force-dynamic";
 // Mapeia URL → label legível
 const PATH_LABELS: Record<string, string> = {
   "/gestor": "Dashboard",
+  "/gestor/relatorios": "Relatórios",
   "/gestor/aprovar": "Aprovar Usuários",
   "/gestor/equipes": "Equipes",
   "/tecnico": "Meus Serviços",
@@ -41,6 +42,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   const links = [
     { href: "/gestor", label: "Dashboard", icon: "📊", roles: ["gestor", "admin"] },
+    { href: "/gestor/relatorios", label: "Relatórios", icon: "📈", roles: ["gestor", "admin"] },
     { href: "/gestor/aprovar", label: "Aprovar Usuários", icon: "👥", roles: ["gestor", "admin"] },
     { href: "/gestor/equipes", label: "Equipes", icon: "🔧", roles: ["gestor", "admin"] },
     { href: "/tecnico", label: "Meus Serviços", icon: "📋", roles: ["tecnico"] },
