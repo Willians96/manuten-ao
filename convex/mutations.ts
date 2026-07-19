@@ -732,3 +732,87 @@ export const forceAdminMaster = mutation({
     return { ok: true, newRole: "admin" };
   },
 });
+
+// -- Editar / Excluir Tecnico ------------------------------------------------
+export const editarTecnico = mutation({
+  args: {
+    tecnicoId: v.id("tecnicos"),
+    graduacao: v.string(),
+    nomeDeGuerra: v.string(),
+    re: v.string(),
+    equipeId: v.id("equipes"),
+    ativo: v.boolean(),
+  },
+  handler: async (ctx, args) => {
+    const currentUserId = await getCurrentUserId(ctx);
+    if (!currentUserId) throw new Error("Não autenticado");
+
+    const currentUser = await ctx.db
+      .query("users")
+      .withIndex("by_clerkId", (q) => q.eq("clerkId", currentUserId))
+      .first();
+    if (!currentUser || (currentUser.role !== "gestor" && currentUser.role !== "admin")) {
+      throw new Error("Não autorizado");
+    }
+
+    const tecnico = await ctx.db.get(args.tecnicoId);
+    if (!tecnico) throw new Error("Técnico não encontrado");
+
+    // Atualiza o tecnico
+    await ctx.db.patch(args.tecnicoId, {
+      graduacao: args.graduacao,
+      nomeDeGuerra: args.nomeDeGuerra,
+      re: args.re,
+      equipeId: args.equipeId,
+      ativo: args.ativo,
+    });
+
+    // Sincroniza os dados no user placeholder (se for placeholder)
+    const user = await ctx.db.get(tecnico.userId);
+    if (user && user.clerkId.startsWith("pendente:")) {
+      await ctx.db.patch(tecnico.userId, {
+        graduacao: args.graduacao,
+        nomeDeGuerra: args.nomeDeGuerra,
+        re: args.re,
+        name: args.nomeDeGuerra,
+      });
+    }
+
+    return args.tecnicoId;
+  },
+});
+
+export const excluirTecnico = mutation({
+  args: { tecnicoId: v.id("tecnicos") },
+  handler: async (ctx, args) => {
+    const currentUserId = await getCurrentUserId(ctx);
+    if (!currentUserId) throw new Error("Não autenticado");
+
+    const currentUser = await ctx.db
+      .query("users")
+      .withIndex("by_clerkId", (q) => q.eq("clerkId", currentUserId))
+      .first();
+    if (!currentUser || (currentUser.role !== "gestor" && currentUser.role !== "admin")) {
+      throw new Error("Não autorizado");
+    }
+
+    const tecnico = await ctx.db.get(args.tecnicoId);
+    if (!tecnico) throw new Error("Técnico não encontrado");
+
+    // Verifica se há serviços pendentes atribuídos a este tecnico
+    const servicosPendentes = await ctx.db
+      .query("servicos")
+      .withIndex("by_status", (q) => q.eq("status", "em_andamento"))
+      .filter((q) => q.eq(q.field("tecnicoId"), args.tecnicoId))
+      .first();
+
+    if (servicosPendentes) {
+      throw new Error("Não é possível excluir: técnico tem serviços em andamento");
+    }
+
+    // Soft delete: marca como inativo
+    await ctx.db.patch(args.tecnicoId, { ativo: false });
+
+    return { ok: true, softDeleted: true };
+  },
+});
