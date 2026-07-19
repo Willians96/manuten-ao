@@ -265,7 +265,16 @@ export const upsertUser = mutation({
 });
 
 export const approveUser = mutation({
-  args: { userId: v.id("users") },
+  args: {
+    userId: v.id("users"),
+    role: v.optional(
+      v.union(
+        v.literal("solicitante"),
+        v.literal("gestor"),
+        v.literal("tecnico")
+      )
+    ),
+  },
   handler: async (ctx, args) => {
     const currentUserId = await getCurrentUserId(ctx);
     if (!currentUserId) throw new Error("Não autenticado");
@@ -276,7 +285,10 @@ export const approveUser = mutation({
     if (!user || (user.role !== "gestor" && user.role !== "admin")) {
       throw new Error("Não autorizado");
     }
-    await ctx.db.patch(args.userId, { approved: true });
+    await ctx.db.patch(args.userId, {
+      approved: true,
+      ...(args.role && { role: args.role }),
+    });
   },
 });
 
