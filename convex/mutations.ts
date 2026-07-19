@@ -220,6 +220,27 @@ export const upsertUser = mutation({
       });
       return existing._id;
     } else {
+      // ── Verifica se é um tecnico pre-cadastrado (placeholder) ──
+      // Se o RE bater com um placeholder criado pelo cadastrarTecnico, vincula
+      if (args.re) {
+        const placeholder = await ctx.db
+          .query("users")
+          .withIndex("by_clerkId", (q) => q.eq("clerkId", `pendente:${args.re}`))
+          .first();
+        if (placeholder) {
+          // Atualiza o placeholder com o clerkId real
+          await ctx.db.patch(placeholder._id, {
+            clerkId: args.clerkId,
+            email: args.email,
+            name: args.name,
+            ...(args.graduacao && { graduacao: args.graduacao }),
+            ...(args.nomeDeGuerra && { nomeDeGuerra: args.nomeDeGuerra }),
+            ...(args.secao && { secao: args.secao }),
+          });
+          return placeholder._id;
+        }
+      }
+
       // ── Primeiro acesso: vira admin master automaticamente ──
       const totalUsers = await ctx.db.query("users").take(2);
       const isFirstUser = totalUsers.length === 0;
@@ -618,23 +639,53 @@ export const cadastrarTecnico = mutation({
     re: v.string(),
   },
   handler: async (ctx, args) => {
-    const userId = await getCurrentUserId(ctx);
-    if (!userId) throw new Error("Não autenticado");
+    const currentUserId = await getCurrentUserId(ctx);
+    if (!currentUserId) throw new Error("Não autenticado");
 
-    const user = await ctx.db
+    const currentUser = await ctx.db
       .query("users")
-      .withIndex("by_clerkId", (q) => q.eq("clerkId", userId))
+      .withIndex("by_clerkId", (q) => q.eq("clerkId", currentUserId))
       .first();
 
-    if (!user || (user.role !== "gestor" && user.role !== "admin")) {
+    if (!currentUser || (currentUser.role !== "gestor" && currentUser.role !== "admin")) {
       throw new Error("Não autorizado");
     }
 
-    // upsert user como tecnico
-    await ctx.db.patch(user._id, { role: "tecnico", approved: true });
+    // Verifica se já existe um tecnico com esse RE
+    const existingTecnico = await ctx.db
+      .query("tecnicos")
+      .filter((q) => q.eq(q.field("re"), args.re))
+      .first();
+
+    if (existingTecnico) {
+      // Atualiza a equipe (mover de equipe, se trocou)
+      await ctx.db.patch(existingTecnico._id, {
+        equipeId: args.equipeId,
+        graduacao: args.graduacao,
+        nomeDeGuerra: args.nomeDeGuerra,
+        ativo: true,
+      });
+      return existingTecnico._id;
+    }
+
+    // Cria um user PLACEHOLDER pro tecnico (clerkId fake)
+    // Quando o tecnico real logar, o upsertUser vincula pelo RE
+    const placeholderClerkId = `pendente:${args.re}`;
+    const newUserId = await ctx.db.insert("users", {
+      clerkId: placeholderClerkId,
+      email: `${args.re}@pendente.pmesp`,
+      name: args.nomeDeGuerra,
+      role: "tecnico",
+      graduacao: args.graduacao,
+      nomeDeGuerra: args.nomeDeGuerra,
+      re: args.re,
+      secao: "Manutenção",
+      approved: true,
+      createdAt: Date.now(),
+    });
 
     return await ctx.db.insert("tecnicos", {
-      userId: user._id,
+      userId: newUserId,
       equipeId: args.equipeId,
       graduacao: args.graduacao,
       nomeDeGuerra: args.nomeDeGuerra,
@@ -668,12 +719,12 @@ export const forceAdminMaster = mutation({
   args: {},
   handler: async (ctx) => {
     const userId = await getCurrentUserId(ctx);
-    if (!userId) throw new Error("N�o autenticado");
+    if (!userId) throw new Error("N�o autenticado");
     const user = await ctx.db
       .query("users")
       .withIndex("by_clerkId", (q) => q.eq("clerkId", userId))
       .first();
-    if (!user) throw new Error("User n�o existe no banco. Preencha o perfil em /pendente primeiro.");
+    if (!user) throw new Error("User n�o existe no banco. Preencha o perfil em /pendente primeiro.");
     await ctx.db.patch(user._id, {
       role: "admin",
       approved: true,
