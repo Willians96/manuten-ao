@@ -83,9 +83,9 @@ export default function TecnicoPage() {
 
   return (
     <div className="page-container">
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20, gap: 20, flexWrap: "wrap" }}>
         <h1 className="page-title" style={{ margin: 0 }}>🔧 Painel do Técnico</h1>
-        <button className="btn btn-primary" onClick={() => setShowCadastroRapido(!showCadastroRapido)}>
+        <button className="btn btn-primary" onClick={() => setShowCadastroRapido(!showCadastroRapido)} style={{ whiteSpace: "nowrap" }}>
           {showCadastroRapido ? "✖ Fechar" : "⚡ Cadastro Rápido"}
         </button>
       </div>

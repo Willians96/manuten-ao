@@ -224,6 +224,8 @@ tr:hover td { background: #f8fafc; }
   font-weight: 700;
   margin-bottom: 20px;
   color: var(--pm-blue);
+  margin-right: 16px; /* evita que titulo encoste em botoes/badges ao lado */
+  flex-shrink: 0; /* impede de comprimir o titulo */
 }
 
 /* Responsive */
