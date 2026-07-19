@@ -8,11 +8,18 @@ export const dynamic = "force-dynamic";
 export default function TecnicoPage() {
   const servicos = useQuery(api.mutations.listServicos, {});
   const equipes = useQuery(api.mutations.listEquipes);
+  const tecnicos = useQuery(api.mutations.listTecnicos, {});
+  const me = useQuery(api.mutations.me);
   const iniciar = useMutation(api.mutations.iniciarServico);
   const encerrar = useMutation(api.mutations.encerrarServico);
   const pausar = useMutation(api.mutations.pausarServico);
   const retomar = useMutation(api.mutations.retomarServico);
   const criarDireto = useMutation(api.mutations.criarServicoDireto);
+
+  // Acha o tecnico atual (vinculado ao user logado)
+  const tecnico = (tecnicos ?? []).find((t: any) =>
+    me && (t as any).user?.clerkId === (me as any).clerkId
+  );
 
   const [encerrarObs, setEncerrarObs] = useState<string | null>(null);
   const [pausarServ, setPausarServ] = useState<string | null>(null);
@@ -27,7 +34,18 @@ export default function TecnicoPage() {
   });
 
   const emAndamento = (servicos ?? []).filter((s: any) => s.status === "em_andamento");
-  const aguardando = (servicos ?? []).filter((s: any) => s.status === "aprovado");
+
+  // Aguardando separados: atribuídos a mim vs disponíveis na equipe
+  const aguardandoMeus = (servicos ?? []).filter((s: any) =>
+    s.status === "aprovado" && s.tecnicoId && tecnico?._id && s.tecnicoId === tecnico._id
+  );
+  const aguardandoEquipe = (servicos ?? []).filter((s: any) =>
+    s.status === "aprovado" && !s.tecnicoId
+  );
+  const aguardandoOutros = (servicos ?? []).filter((s: any) =>
+    s.status === "aprovado" && s.tecnicoId && tecnico?._id && s.tecnicoId !== tecnico._id
+  );
+
   const pausados = (servicos ?? []).filter((s: any) => s.status === "pausado");
 
   async function handleIniciar(servicoId: any) {
@@ -218,14 +236,48 @@ export default function TecnicoPage() {
       {/* ── Aguardando ──────────────────────────────────────────────────── */}
       <div>
         <h2 style={{ fontSize: 16, fontWeight: 600, marginBottom: 12, color: "#1e40af" }}>
-          📋 Aguardando Execução ({aguardando.length})
+          📋 Aguardando Execução ({aguardandoMeus.length + aguardandoEquipe.length})
         </h2>
         <div style={{ display: "grid", gap: 12 }}>
-          {aguardando.map((s: any) => (
-            <ServicoCard key={s._id} servico={s} onIniciar={handleIniciar} />
-          ))}
-          {aguardando.length === 0 && (
+
+          {/* Atribuídos a mim */}
+          {aguardandoMeus.length > 0 && (
+            <>
+              <div style={{ fontSize: 13, fontWeight: 700, color: "#1e40af", marginTop: 4 }}>
+                🎯 Atribuídos a mim ({aguardandoMeus.length})
+              </div>
+              {aguardandoMeus.map((s: any) => (
+                <ServicoCard key={s._id} servico={s} onIniciar={handleIniciar} />
+              ))}
+            </>
+          )}
+
+          {/* Disponíveis para qualquer um */}
+          {aguardandoEquipe.length > 0 && (
+            <>
+              <div style={{ fontSize: 13, fontWeight: 700, color: "#166534", marginTop: aguardandoMeus.length > 0 ? 12 : 4 }}>
+                🤝 Disponíveis na equipe ({aguardandoEquipe.length}) — qualquer um pode pegar
+              </div>
+              {aguardandoEquipe.map((s: any) => (
+                <ServicoCard key={s._id} servico={s} onIniciar={handleIniciar} />
+              ))}
+            </>
+          )}
+
+          {aguardandoMeus.length === 0 && aguardandoEquipe.length === 0 && (
             <p style={{ color: "#6b7280", fontSize: 14 }}>Nenhum serviço aguardando execução.</p>
+          )}
+
+          {/* Atribuídos a outros (só mostra se houver) */}
+          {aguardandoOutros.length > 0 && (
+            <>
+              <div style={{ fontSize: 13, fontWeight: 700, color: "#6b7280", marginTop: 12 }}>
+                👥 Atribuídos a outros da equipe ({aguardandoOutros.length}) — você não pode pegar
+              </div>
+              {aguardandoOutros.map((s: any) => (
+                <ServicoCard key={s._id} servico={s} onIniciar={handleIniciar} />
+              ))}
+            </>
           )}
         </div>
       </div>

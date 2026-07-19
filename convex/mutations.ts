@@ -331,6 +331,7 @@ export const atribuirServico = mutation({
   args: {
     servicoId: v.id("servicos"),
     equipeId: v.id("equipes"),
+    tecnicoId: v.optional(v.id("tecnicos")), // atribuir a um tecnico especifico (opcional)
     dataAgendada: v.optional(v.string()),
     observacao: v.optional(v.string()),
   },
@@ -356,6 +357,7 @@ export const atribuirServico = mutation({
 
     await ctx.db.patch(args.servicoId, {
       equipeId: args.equipeId,
+      tecnicoId: args.tecnicoId, // se null, qualquer tecnico da equipe pode pegar
       dataAgendada: args.dataAgendada,
       observacaoGestor: args.observacao,
       status: novoStatus as any,
@@ -475,6 +477,10 @@ export const iniciarServico = mutation({
     const servico = await ctx.db.get(args.servicoId);
     if (!servico || servico.equipeId !== tecnico.equipeId) {
       throw new Error("Serviço não pertence à sua equipe");
+    }
+    // Se já tem tecnicoId definido (específico), só esse pode iniciar
+    if (servico.tecnicoId && servico.tecnicoId !== tecnico._id) {
+      throw new Error("Este serviço está atribuído a outro técnico da sua equipe");
     }
 
     await ctx.db.patch(args.servicoId, {

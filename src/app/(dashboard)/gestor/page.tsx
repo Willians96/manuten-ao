@@ -35,9 +35,11 @@ export default function GestorPage() {
   async function handleAtribuir(e: React.FormEvent) {
     e.preventDefault();
     const fd = new FormData(e.target as HTMLFormElement);
+    const tecnicoId = (fd.get("tecnicoId") as string) || "";
     await atribuir({
       servicoId: modalAtr._id,
       equipeId: fd.get("equipeId") as any,
+      tecnicoId: tecnicoId ? (tecnicoId as any) : undefined,
       dataAgendada: fd.get("dataAgendada") as string || undefined,
       observacao: fd.get("observacao") as string || undefined,
     });
@@ -160,6 +162,7 @@ export default function GestorPage() {
               <th>Local</th>
               <th>Urgência</th>
               <th>Equipe</th>
+              <th>Responsável</th>
               <th>Status</th>
               <th>Agendado / Início</th>
               <th>Ações</th>
@@ -191,6 +194,18 @@ export default function GestorPage() {
                     </span>
                   </td>
                   <td style={{ fontSize: 13 }}>{equipe?.nome ?? "—"}</td>
+                  <td style={{ fontSize: 12 }}>
+                    {s.tecnicoId ? (() => {
+                      const tec = (tecnicos ?? []).find((t: any) => t._id === s.tecnicoId);
+                      return tec ? (
+                        <span style={{ background: "#dbeafe", color: "#1e40af", padding: "2px 6px", borderRadius: 4, fontSize: 11, fontWeight: 600 }}>
+                          👤 {tec.nomeDeGuerra}
+                        </span>
+                      ) : <span style={{ color: "#9ca3af", fontSize: 11 }}>—</span>;
+                    })() : (
+                      <span style={{ color: "#9ca3af", fontSize: 11, fontStyle: "italic" }}>Qualquer um</span>
+                    )}
+                  </td>
                   <td>
                     <span className={`badge ${s.status}`}>
                       {s.status.replace("_", " ")}
@@ -267,7 +282,7 @@ export default function GestorPage() {
             })}
             {servicosVisiveis?.length === 0 && (
               <tr>
-                <td colSpan={8} style={{ textAlign: "center", color: "#6b7280", padding: 24 }}>
+                <td colSpan={9} style={{ textAlign: "center", color: "#6b7280", padding: 24 }}>
                   Nenhuma solicitação encontrada.
                 </td>
               </tr>
@@ -321,6 +336,27 @@ export default function GestorPage() {
                     <option key={eq._id} value={eq._id}>{eq.nome}</option>
                   ))}
                 </select>
+              </div>
+              <div className="form-group">
+                <label>
+                  Técnico responsável <span style={{ color: "#6b7280", fontSize: 12 }}>(opcional)</span>
+                </label>
+                <select name="tecnicoId">
+                  <option value="">— Qualquer um da equipe pode pegar —</option>
+                  {(tecnicos ?? [])
+                    .filter((t: any) => t.ativo && (t.status === "ativo" || !t.status))
+                    .map((t: any) => {
+                      const eq = stats.equipes.find((e: any) => e._id === t.equipeId);
+                      return (
+                        <option key={t._id} value={t._id}>
+                          {t.nomeDeGuerra} ({t.graduacao}) — {eq?.nome ?? "Sem equipe"}
+                        </option>
+                      );
+                    })}
+                </select>
+                <div style={{ fontSize: 11, color: "#6b7280", marginTop: 4 }}>
+                  💡 Se deixar em branco, qualquer técnico ativo da equipe pode iniciar o serviço.
+                </div>
               </div>
               <div className="form-group">
                 <label>Data Agendada</label>
