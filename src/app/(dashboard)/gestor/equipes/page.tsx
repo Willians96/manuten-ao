@@ -261,7 +261,7 @@ export default function EquipesPage() {
                     required
                   >
                     <option value="">Selecione...</option>
-                    {["Sd","Cb","3º Sgt","2º Sgt","1º Sgt","ST","Asp","2º Ten","1º Ten","Cap","Maj","Ten Cel","Cel"].map((g) => (
+                    {["Sd","Cb","3º Sgt","2º Sgt","1º Sgt","Asp","2º Ten","1º Ten","Cap","Maj","Ten Cel","Cel"].map((g) => (
                       <option key={g} value={g}>{g}</option>
                     ))}
                   </select>

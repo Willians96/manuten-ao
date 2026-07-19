@@ -124,7 +124,6 @@ export default function PendentePage() {
               <option>3º Sgt</option>
               <option>2º Sgt</option>
               <option>1º Sgt</option>
-              <option>ST</option>
               <option>Asp</option>
               <option>2º Ten</option>
               <option>1º Ten</option>

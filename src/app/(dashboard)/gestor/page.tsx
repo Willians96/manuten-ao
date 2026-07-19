@@ -222,7 +222,7 @@ export default function GestorPage() {
               <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 8, color: "#003882" }}>
                 👥 Técnicos por Equipe (visão rápida)
               </div>
-              {(tecnicos ?? []).reduce<any[]>((acc, t) => {
+              {(tecnicos ?? []).filter((t: any) => t.ativo).reduce<any[]>((acc, t) => {
                 const eq = stats.equipes.find((e: any) => e._id === t.equipeId);
                 return [...acc, { tecnico: t, equipe: eq }];
               }, []).map((item: any) => (
