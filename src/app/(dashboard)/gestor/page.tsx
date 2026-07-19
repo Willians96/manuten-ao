@@ -82,7 +82,7 @@ export default function GestorPage() {
 
   return (
     <div className="page-container">
-      <h1 className="page-title">📊 Dashboard — Gestão de Manutenção</h1>
+      <h1 className="page-title">📊 Dashboard — Gestão de Manutenção {isAdminMaster && <span style={{ fontSize: 14, marginLeft: 12, background: "#f6d700", color: "#003882", padding: "4px 10px", borderRadius: 12, fontWeight: 700 }}>👑 Admin Master</span>}</h1>
 
       {/* Stats */}
       <div className="stat-grid">
@@ -238,12 +238,12 @@ export default function GestorPage() {
                       )}
                       {isAdminMaster && (
                         <button
-                          className="btn btn-outline"
-                          style={{ fontSize: 11, padding: "3px 8px", color: "#dc2626", borderColor: "#fecaca" }}
+                          className="btn"
+                          style={{ fontSize: 11, padding: "4px 10px", background: "#dc2626", color: "#fff", border: "1px solid #dc2626" }}
                           onClick={() => handleExcluir(s)}
                           title="Excluir permanentemente (apenas Admin Master)"
                         >
-                          🗑
+                          🗑 Excluir
                         </button>
                       )}
                     </div>
