@@ -28,7 +28,7 @@ export default function EquipesPage() {
   const [novaEquipe, setNovaEquipe] = useState("");
   const [showInativos, setShowInativos] = useState(false);
   const [cadTecnico, setCadTecnico] = useState({
-    equipeId: "", graduacao: "", nomeDeGuerra: "", re: ""
+    graduacao: "", nomeDeGuerra: "", re: ""
   });
   const [editT, setEditT] = useState<any>(null);
   const [editForm, setEditForm] = useState({
@@ -42,17 +42,21 @@ export default function EquipesPage() {
     catch (e: any) { alert(e.message); }
   }
 
-  async function handleCadastrarTecnico(e: React.FormEvent) {
-    e.preventDefault();
-    try {
-      await cadastrarTecnico({
-        equipeId: cadTecnico.equipeId as any,
-        graduacao: cadTecnico.graduacao,
-        nomeDeGuerra: cadTecnico.nomeDeGuerra,
-        re: cadTecnico.re,
-      });
-      setCadTecnico({ equipeId: "", graduacao: "", nomeDeGuerra: "", re: "" });
-    } catch (e: any) { alert(e.message); }
+  function handleCadastrarTecnico(equipeId: string) {
+    return (e: React.FormEvent) => {
+      e.preventDefault();
+      void (async () => {
+        try {
+          await cadastrarTecnico({
+            equipeId: equipeId as any,
+            graduacao: cadTecnico.graduacao,
+            nomeDeGuerra: cadTecnico.nomeDeGuerra,
+            re: cadTecnico.re,
+          });
+          setCadTecnico({ graduacao: "", nomeDeGuerra: "", re: "" });
+        } catch (e: any) { alert(e.message); }
+      })();
+    };
   }
 
   function openEdit(t: any) {
@@ -231,22 +235,23 @@ export default function EquipesPage() {
             {/* Cadastrar técnico */}
             <details>
               <summary style={{ cursor: "pointer", fontSize: 13, color: "#003882", fontWeight: 500 }}>
-                ➕ Cadastrar Técnico nesta Equipe
+                ➕ Cadastrar Técnico em {eq.nome}
               </summary>
-              <form onSubmit={handleCadastrarTecnico} style={{ marginTop: 12, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-                <input type="hidden" value={eq._id} onChange={() => {}} />
-                <div className="form-group">
-                  <label>Equipe</label>
-                  <select
-                    value={cadTecnico.equipeId}
-                    onChange={(e) => setCadTecnico({ ...cadTecnico, equipeId: e.target.value })}
-                    required
-                  >
-                    <option value="">Selecione...</option>
-                    {(equipes ?? []).map((e: any) => (
-                      <option key={e._id} value={e._id}>{e.nome}</option>
-                    ))}
-                  </select>
+              <form onSubmit={handleCadastrarTecnico(eq._id)} style={{ marginTop: 12, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                {/* Equipe fixo: a equipe atual (não permite trocar) */}
+                <input
+                  type="hidden"
+                  value={eq._id}
+                  readOnly
+                />
+                <div className="form-group" style={{ margin: 0 }}>
+                  <label>Equipe destino</label>
+                  <input
+                    type="text"
+                    value={eq.nome}
+                    disabled
+                    style={{ background: "#f1f5f9", color: "#6b7280", fontWeight: 600 }}
+                  />
                 </div>
                 <div className="form-group">
                   <label>Graduação</label>
@@ -256,7 +261,7 @@ export default function EquipesPage() {
                     required
                   >
                     <option value="">Selecione...</option>
-                    {["Cb","ST","1º Sgt","2º Sgt","3º Sgt","Sd","Ten Cel","Maj","Cap","1º Ten","2º Ten"].map((g) => (
+                    {["Sd","Cb","3º Sgt","2º Sgt","1º Sgt","ST","Asp","2º Ten","1º Ten","Cap","Maj","Ten Cel","Cel"].map((g) => (
                       <option key={g} value={g}>{g}</option>
                     ))}
                   </select>
@@ -282,7 +287,7 @@ export default function EquipesPage() {
                   />
                 </div>
                 <div style={{ gridColumn: "1 / -1" }}>
-                  <button type="submit" className="btn btn-success">Cadastrar</button>
+                  <button type="submit" className="btn btn-success">Cadastrar em {eq.nome}</button>
                 </div>
               </form>
             </details>

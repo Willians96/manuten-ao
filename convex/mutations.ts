@@ -658,14 +658,20 @@ export const cadastrarTecnico = mutation({
       .first();
 
     if (existingTecnico) {
-      // Atualiza a equipe (mover de equipe, se trocou)
-      await ctx.db.patch(existingTecnico._id, {
-        equipeId: args.equipeId,
-        graduacao: args.graduacao,
-        nomeDeGuerra: args.nomeDeGuerra,
-        ativo: true,
-      });
-      return existingTecnico._id;
+      // Se jÃ¡ existe o RE: atualiza SÃ“ se for da MESMA equipe
+      // (se for de outra equipe, Ã© o mesmo PM com RE duplicado â€” nÃ£o mexe)
+      if (existingTecnico.equipeId === args.equipeId) {
+        await ctx.db.patch(existingTecnico._id, {
+          graduacao: args.graduacao,
+          nomeDeGuerra: args.nomeDeGuerra,
+          ativo: true,
+        });
+        return existingTecnico._id;
+      }
+      // RE existe em outra equipe â†’ throw
+      throw new Error(
+        `JÃ¡ existe um tÃ©cnico com RE ${args.re} em outra equipe. Use o botÃ£o "Editar" para movÃª-lo.`
+      );
     }
 
     // Cria um user PLACEHOLDER pro tecnico (clerkId fake)
@@ -745,18 +751,18 @@ export const editarTecnico = mutation({
   },
   handler: async (ctx, args) => {
     const currentUserId = await getCurrentUserId(ctx);
-    if (!currentUserId) throw new Error("Não autenticado");
+    if (!currentUserId) throw new Error("Nï¿½o autenticado");
 
     const currentUser = await ctx.db
       .query("users")
       .withIndex("by_clerkId", (q) => q.eq("clerkId", currentUserId))
       .first();
     if (!currentUser || (currentUser.role !== "gestor" && currentUser.role !== "admin")) {
-      throw new Error("Não autorizado");
+      throw new Error("Nï¿½o autorizado");
     }
 
     const tecnico = await ctx.db.get(args.tecnicoId);
-    if (!tecnico) throw new Error("Técnico não encontrado");
+    if (!tecnico) throw new Error("Tï¿½cnico nï¿½o encontrado");
 
     // Atualiza o tecnico
     await ctx.db.patch(args.tecnicoId, {
@@ -786,20 +792,20 @@ export const excluirTecnico = mutation({
   args: { tecnicoId: v.id("tecnicos") },
   handler: async (ctx, args) => {
     const currentUserId = await getCurrentUserId(ctx);
-    if (!currentUserId) throw new Error("Não autenticado");
+    if (!currentUserId) throw new Error("Nï¿½o autenticado");
 
     const currentUser = await ctx.db
       .query("users")
       .withIndex("by_clerkId", (q) => q.eq("clerkId", currentUserId))
       .first();
     if (!currentUser || (currentUser.role !== "gestor" && currentUser.role !== "admin")) {
-      throw new Error("Não autorizado");
+      throw new Error("Nï¿½o autorizado");
     }
 
     const tecnico = await ctx.db.get(args.tecnicoId);
-    if (!tecnico) throw new Error("Técnico não encontrado");
+    if (!tecnico) throw new Error("Tï¿½cnico nï¿½o encontrado");
 
-    // Verifica se há serviços pendentes atribuídos a este tecnico
+    // Verifica se hï¿½ serviï¿½os pendentes atribuï¿½dos a este tecnico
     const servicosPendentes = await ctx.db
       .query("servicos")
       .withIndex("by_status", (q) => q.eq("status", "em_andamento"))
@@ -807,7 +813,7 @@ export const excluirTecnico = mutation({
       .first();
 
     if (servicosPendentes) {
-      throw new Error("Não é possível excluir: técnico tem serviços em andamento");
+      throw new Error("Nï¿½o ï¿½ possï¿½vel excluir: tï¿½cnico tem serviï¿½os em andamento");
     }
 
     // Soft delete: marca como inativo

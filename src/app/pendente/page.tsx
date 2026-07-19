@@ -119,19 +119,19 @@ export default function PendentePage() {
             <label>Graduação</label>
             <select value={graduacao} onChange={(e) => setGraduacao(e.target.value)} required>
               <option value="">Selecione...</option>
-              <option>Cel</option>
-              <option>Ten Cel</option>
-              <option>Maj</option>
-              <option>Cap</option>
-              <option>1º Ten</option>
-              <option>2º Ten</option>
-              <option>Asp</option>
-              <option>ST</option>
               <option>Sd</option>
-              <option>CB</option>
+              <option>Cb</option>
               <option>3º Sgt</option>
               <option>2º Sgt</option>
               <option>1º Sgt</option>
+              <option>ST</option>
+              <option>Asp</option>
+              <option>2º Ten</option>
+              <option>1º Ten</option>
+              <option>Cap</option>
+              <option>Maj</option>
+              <option>Ten Cel</option>
+              <option>Cel</option>
               <option>Aluno</option>
               <option>Civil</option>
             </select>

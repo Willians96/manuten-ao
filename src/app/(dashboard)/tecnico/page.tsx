@@ -104,7 +104,7 @@ export default function TecnicoPage() {
                   <label>Graduação</label>
                   <select value={cr.solicitanteGraduacao} onChange={set("solicitanteGraduacao")} required>
                     <option value="">Selecione...</option>
-                    {["Cel","Ten Cel","Maj","Cap","1º Ten","2º Ten","ST","Cb","3º Sgt","2º Sgt","1º Sgt","Sd","Aluno","Civil"].map(g => (
+                    {["Sd","Cb","3º Sgt","2º Sgt","1º Sgt","ST","Asp","2º Ten","1º Ten","Cap","Maj","Ten Cel","Cel","Aluno","Civil"].map(g => (
                       <option key={g} value={g}>{g}</option>
                     ))}
                   </select>
