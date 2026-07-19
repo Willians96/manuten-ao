@@ -67,7 +67,47 @@ export default function RelatoriosPage() {
       .sort(([, a], [, b]) => b - a)
       .slice(0, 10);
 
-    return { meses, porTecnico, locaisOrdenados };
+    // Serviços REALIZADOS (concluídos) por equipe com data
+    const concluidos = servicos.filter((s: any) => s.status === "concluido");
+    const porEquipeComData: {
+      equipe: string;
+      servicos: { titulo: string; data: string; tecnico: string; duracao: number; local: string }[];
+    }[] = [];
+    for (const eq of equipes) {
+      const daEquipe = concluidos
+        .filter((s: any) => s.equipeId === eq._id)
+        .map((s: any) => {
+          // pega o tecnico
+          const tec = tecnicos.find((t: any) => t._id === s.tecnicoId);
+          // calcula duracao
+          let duracao = 0;
+          if (s.dataInicioExec && s.dataFimExec) {
+            const inicio = new Date(s.dataInicioExec).getTime();
+            const fim = new Date(s.dataFimExec).getTime();
+            duracao = Math.round((fim - inicio) / 60000);
+          }
+          // data: usa dataFimExec se existir, senao createdAt
+          const dataRef = s.dataFimExec
+            ? new Date(s.dataFimExec).toLocaleDateString("pt-BR")
+            : new Date(s._creationTime).toLocaleDateString("pt-BR");
+          return {
+            titulo: s.titulo,
+            data: dataRef,
+            tecnico: tec?.nomeDeGuerra ?? "—",
+            duracao,
+            local: s.local,
+          };
+        })
+        .sort((a: any, b: any) => {
+          // converte data DD/MM/YYYY pra Date e compara
+          const [da, ma, ya] = a.data.split("/").map(Number);
+          const [db, mb, yb] = b.data.split("/").map(Number);
+          return new Date(yb, mb - 1, db).getTime() - new Date(ya, ma - 1, da).getTime();
+        });
+      porEquipeComData.push({ equipe: eq.nome, servicos: daEquipe });
+    }
+
+    return { meses, porTecnico, locaisOrdenados, porEquipeComData };
   }, [stats, servicos, equipes, tecnicos]);
 
   function exportCSV() {
@@ -280,6 +320,62 @@ export default function RelatoriosPage() {
             )}
           </tbody>
         </table>
+      </div>
+
+      {/* Serviços Realizados por Equipe */}
+      <div className="card" style={{ marginBottom: 24 }}>
+        <h2 style={{ fontSize: 18, marginBottom: 4, color: "#003882" }}>✅ Serviços Realizados por Equipe</h2>
+        <p style={{ fontSize: 12, color: "#6b7280", marginBottom: 12 }}>
+          Lista de todos os serviços concluídos, agrupados por equipe, com data e técnico responsável.
+        </p>
+
+        {relatorio.porEquipeComData.map((grupo) => (
+          <div key={grupo.equipe} style={{ marginBottom: 20, border: "1px solid #e2e8f0", borderRadius: 8, overflow: "hidden" }}>
+            <div style={{
+              background: "#003882", color: "#fff", padding: "10px 14px",
+              display: "flex", justifyContent: "space-between", alignItems: "center"
+            }}>
+              <strong style={{ fontSize: 14 }}>👥 {grupo.equipe}</strong>
+              <span style={{ fontSize: 12, background: "rgba(255,255,255,0.2)", padding: "2px 8px", borderRadius: 10 }}>
+                {grupo.servicos.length} serviços
+              </span>
+            </div>
+            {grupo.servicos.length === 0 ? (
+              <div style={{ padding: 16, textAlign: "center", color: "#6b7280", fontSize: 13 }}>
+                Nenhum serviço concluído por esta equipe ainda.
+              </div>
+            ) : (
+              <table style={{ margin: 0 }}>
+                <thead>
+                  <tr>
+                    <th style={{ width: 100 }}>Data</th>
+                    <th>Serviço</th>
+                    <th>Local</th>
+                    <th>Técnico</th>
+                    <th style={{ width: 80 }}>Duração</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {grupo.servicos.map((s, idx) => (
+                    <tr key={idx}>
+                      <td style={{ whiteSpace: "nowrap", fontFamily: "monospace", fontSize: 13 }}>{s.data}</td>
+                      <td>{s.titulo}</td>
+                      <td style={{ fontSize: 13 }}>{s.local}</td>
+                      <td style={{ fontSize: 13 }}>{s.tecnico}</td>
+                      <td style={{ fontSize: 13 }}>{s.duracao > 0 ? `${s.duracao} min` : "—"}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+        ))}
+
+        {relatorio.porEquipeComData.every((g) => g.servicos.length === 0) && (
+          <div style={{ textAlign: "center", color: "#6b7280", padding: 20 }}>
+            Nenhum serviço concluído ainda.
+          </div>
+        )}
       </div>
     </div>
   );
