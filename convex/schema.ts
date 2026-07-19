@@ -20,6 +20,7 @@ export default defineSchema({
     re: v.optional(v.string()),
     secao: v.optional(v.string()),
     approved: v.boolean(), // false = aguardando aprovação do gestor
+    isAdminMaster: v.optional(v.boolean()), // true só pro primeiro admin do sistema
     createdAt: v.number(),
   })
     .index("by_clerkId", ["clerkId"])

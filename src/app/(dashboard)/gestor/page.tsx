@@ -10,10 +10,13 @@ export default function GestorPage() {
   const servicos = useQuery(api.mutations.listServicos, {});
   const equipes = useQuery(api.mutations.listEquipes);
   const tecnicos = useQuery(api.mutations.listTecnicos, {});
+  const me = useQuery(api.mutations.me);
   const atribuir = useMutation(api.mutations.atribuirServico);
   const excluir = useMutation(api.mutations.excluirServico);
   const cancelar = useMutation(api.mutations.cancelarServico);
   const editar = useMutation(api.mutations.editarServico);
+
+  const isAdminMaster = me?.isAdminMaster === true;
 
   const [filtro, setFiltro] = useState("todos");
   const [editS, setEditS] = useState<any>(null);
@@ -233,14 +236,16 @@ export default function GestorPage() {
                           🚫
                         </button>
                       )}
-                      <button
-                        className="btn btn-outline"
-                        style={{ fontSize: 11, padding: "3px 8px", color: "#dc2626", borderColor: "#fecaca" }}
-                        onClick={() => handleExcluir(s)}
-                        title="Excluir permanentemente"
-                      >
-                        🗑
-                      </button>
+                      {isAdminMaster && (
+                        <button
+                          className="btn btn-outline"
+                          style={{ fontSize: 11, padding: "3px 8px", color: "#dc2626", borderColor: "#fecaca" }}
+                          onClick={() => handleExcluir(s)}
+                          title="Excluir permanentemente (apenas Admin Master)"
+                        >
+                          🗑
+                        </button>
+                      )}
                     </div>
                     {s.cadastroDireto && (
                       <span style={{ fontSize: 10, color: "#003882" }}>⚡direto</span>

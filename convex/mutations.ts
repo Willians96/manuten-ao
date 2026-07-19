@@ -1,4 +1,4 @@
-import { v } from "convex/values";
+ï»¿import { v } from "convex/values";
 import { Id } from "./_generated/dataModel";
 import { mutation, query } from "./_generated/server";
 import { getCurrentUserId } from "./auth";
@@ -255,7 +255,8 @@ export const upsertUser = mutation({
         nomeDeGuerra: args.nomeDeGuerra,
         re: args.re,
         secao: args.secao,
-        approved: isAdminMaster, // admin master jÃ¡ fica aprovado direto
+        approved: isAdminMaster,
+        isAdminMaster: isAdminMaster, // marca o primeiro admin como master
         createdAt: Date.now(),
       });
       return id;
@@ -734,6 +735,7 @@ export const forceAdminMaster = mutation({
     await ctx.db.patch(user._id, {
       role: "admin",
       approved: true,
+      isAdminMaster: true,
     });
     return { ok: true, newRole: "admin" };
   },
@@ -823,18 +825,22 @@ export const excluirTecnico = mutation({
   },
 });
 
-// -- Gestão de Serviços (admin/gestor) ---------------------------------------
+// -- Gestï¿½o de Serviï¿½os (admin/gestor) ---------------------------------------
 export const excluirServico = mutation({
   args: { servicoId: v.id("servicos") },
   handler: async (ctx, args) => {
     const currentUserId = await getCurrentUserId(ctx);
-    if (!currentUserId) throw new Error("Não autenticado");
+    if (!currentUserId) throw new Error("Nï¿½o autenticado");
     const currentUser = await ctx.db
       .query("users")
       .withIndex("by_clerkId", (q) => q.eq("clerkId", currentUserId))
       .first();
     if (!currentUser || (currentUser.role !== "gestor" && currentUser.role !== "admin")) {
-      throw new Error("Não autorizado");
+      throw new Error("Nï¿½o autorizado");
+    }
+    // So o admin master pode excluir permanentemente
+    if (!currentUser.isAdminMaster) {
+      throw new Error("Apenas o Admin Master pode excluir. Use Cancelar.");
     }
     // Apaga os logs relacionados
     const logs = await ctx.db
@@ -844,7 +850,7 @@ export const excluirServico = mutation({
     for (const log of logs) {
       await ctx.db.delete(log._id);
     }
-    // Apaga o serviço
+    // Apaga o serviï¿½o
     await ctx.db.delete(args.servicoId);
     return { ok: true };
   },
@@ -854,13 +860,13 @@ export const cancelarServico = mutation({
   args: { servicoId: v.id("servicos") },
   handler: async (ctx, args) => {
     const currentUserId = await getCurrentUserId(ctx);
-    if (!currentUserId) throw new Error("Não autenticado");
+    if (!currentUserId) throw new Error("Nï¿½o autenticado");
     const currentUser = await ctx.db
       .query("users")
       .withIndex("by_clerkId", (q) => q.eq("clerkId", currentUserId))
       .first();
     if (!currentUser || (currentUser.role !== "gestor" && currentUser.role !== "admin")) {
-      throw new Error("Não autorizado");
+      throw new Error("Nï¿½o autorizado");
     }
     await ctx.db.patch(args.servicoId, {
       status: "cancelado",
@@ -885,13 +891,13 @@ export const editarServico = mutation({
   },
   handler: async (ctx, args) => {
     const currentUserId = await getCurrentUserId(ctx);
-    if (!currentUserId) throw new Error("Não autenticado");
+    if (!currentUserId) throw new Error("Nï¿½o autenticado");
     const currentUser = await ctx.db
       .query("users")
       .withIndex("by_clerkId", (q) => q.eq("clerkId", currentUserId))
       .first();
     if (!currentUser || (currentUser.role !== "gestor" && currentUser.role !== "admin")) {
-      throw new Error("Não autorizado");
+      throw new Error("Nï¿½o autorizado");
     }
     await ctx.db.patch(args.servicoId, {
       titulo: args.titulo,
