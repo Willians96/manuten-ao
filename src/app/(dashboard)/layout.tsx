@@ -87,6 +87,14 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               <span>{link.icon}</span> {link.label}
             </Link>
           ))}
+          <Link
+            href="/download"
+            target="_blank"
+            style={{ background: "rgba(246, 215, 0, 0.15)", color: "#f6d700", marginTop: 12, borderTop: "1px solid rgba(255,255,255,0.1)", paddingTop: 14, borderRadius: 0 }}
+            title="Baixar app Android"
+          >
+            <span>📱</span> Baixar App Android
+          </Link>
         </nav>
 
         <div className="sidebar-footer">
