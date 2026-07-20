@@ -25,6 +25,8 @@ export default function GestorPage() {
     titulo: "", descricao: "", local: "", urgencia: "media"
   });
   const [modalAtr, setModalAtr] = useState<any>(null);
+  const [atrEquipeSel, setAtrEquipeSel] = useState<string>("");
+  const [atrTecnicoSel, setAtrTecnicoSel] = useState<string>("");
 
   if (!stats) return <div className="page-container">Carregando...</div>;
 
@@ -44,6 +46,12 @@ export default function GestorPage() {
       observacao: fd.get("observacao") as string || undefined,
     });
     setModalAtr(null);
+  }
+
+  function openAtribuir(s: any) {
+    setModalAtr(s);
+    setAtrEquipeSel("");
+    setAtrTecnicoSel("");
   }
 
   function openEdit(s: any) {
@@ -225,7 +233,7 @@ export default function GestorPage() {
                         <button
                           className="btn btn-primary"
                           style={{ fontSize: 11, padding: "3px 8px" }}
-                          onClick={() => setModalAtr(s)}
+                          onClick={() => openAtribuir(s)}
                         >
                           Atribuir
                         </button>
@@ -234,7 +242,7 @@ export default function GestorPage() {
                         <button
                           className="btn btn-primary"
                           style={{ fontSize: 11, padding: "3px 8px", background: "#c2410c" }}
-                          onClick={() => setModalAtr(s)}
+                          onClick={() => openAtribuir(s)}
                         >
                           🔄 Transferir
                         </button>
@@ -330,7 +338,15 @@ export default function GestorPage() {
             <form onSubmit={handleAtribuir}>
               <div className="form-group">
                 <label>Equipe</label>
-                <select name="equipeId" required>
+                <select
+                  name="equipeId"
+                  required
+                  value={atrEquipeSel}
+                  onChange={(e) => {
+                    setAtrEquipeSel(e.target.value);
+                    setAtrTecnicoSel(""); // reset técnico se mudar equipe
+                  }}
+                >
                   <option value="">Selecione...</option>
                   {(equipes ?? []).map((eq: any) => (
                     <option key={eq._id} value={eq._id}>{eq.nome}</option>
@@ -339,24 +355,41 @@ export default function GestorPage() {
               </div>
               <div className="form-group">
                 <label>
-                  Técnico responsável <span style={{ color: "#6b7280", fontSize: 12 }}>(opcional)</span>
+                  Quem vai executar? <span style={{ color: "#6b7280", fontSize: 12 }}>(opcional)</span>
                 </label>
-                <select name="tecnicoId">
-                  <option value="">— Qualquer um da equipe pode pegar —</option>
-                  {(tecnicos ?? [])
-                    .filter((t: any) => t.ativo && (t.status === "ativo" || !t.status))
-                    .map((t: any) => {
-                      const eq = stats.equipes.find((e: any) => e._id === t.equipeId);
-                      return (
-                        <option key={t._id} value={t._id}>
-                          {t.nomeDeGuerra} ({t.graduacao}) — {eq?.nome ?? "Sem equipe"}
-                        </option>
-                      );
-                    })}
-                </select>
-                <div style={{ fontSize: 11, color: "#6b7280", marginTop: 4 }}>
-                  💡 Se deixar em branco, qualquer técnico ativo da equipe pode iniciar o serviço.
-                </div>
+                {!atrEquipeSel ? (
+                  <div style={{
+                    padding: "10px 12px",
+                    background: "#f1f5f9", color: "#6b7280",
+                    borderRadius: 6, fontSize: 13, fontStyle: "italic"
+                  }}>
+                    ⬆️ Selecione a equipe primeiro
+                  </div>
+                ) : (
+                  <>
+                    <select
+                      name="tecnicoId"
+                      value={atrTecnicoSel}
+                      onChange={(e) => setAtrTecnicoSel(e.target.value)}
+                    >
+                      <option value="">👥 Ambos (qualquer um pega)</option>
+                      {(tecnicos ?? [])
+                        .filter((t: any) =>
+                          t.equipeId === atrEquipeSel &&
+                          t.ativo &&
+                          (t.status === "ativo" || !t.status)
+                        )
+                        .map((t: any, idx: number) => (
+                          <option key={t._id} value={t._id}>
+                            👤 Técnico {idx + 1} — {t.graduacao} {t.nomeDeGuerra}
+                          </option>
+                        ))}
+                    </select>
+                    <div style={{ fontSize: 11, color: "#6b7280", marginTop: 4 }}>
+                      💡 "Ambos" = qualquer técnico ativo da equipe pega o serviço. "Técnico 1/2" = direciona pra um específico.
+                    </div>
+                  </>
+                )}
               </div>
               <div className="form-group">
                 <label>Data Agendada</label>
