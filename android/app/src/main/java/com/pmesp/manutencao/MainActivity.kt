@@ -125,7 +125,7 @@ class MainActivity : Activity() {
             setAcceptThirdPartyCookies(webView, true)
         }
 
-        // === WEB CHROME CLIENT (progresso) ===
+        // === WEB CHROME CLIENT (progresso + janelas) ===
         webView.webChromeClient = object : WebChromeClient() {
             override fun onProgressChanged(view: WebView?, newProgress: Int) {
                 if (newProgress < 100) {
@@ -135,21 +135,53 @@ class MainActivity : Activity() {
                     progressBar.visibility = View.GONE
                 }
             }
+
+            // Captura window.open() (target="_blank") e abre dentro do mesmo WebView
+            override fun onCreateWindow(
+                view: WebView?,
+                isDialog: Boolean,
+                isUserGesture: Boolean,
+                resultMsg: android.os.Message?
+            ): Boolean {
+                if (resultMsg == null) return false
+                val transport = resultMsg.obj as? android.webkit.WebView.WebViewTransport ?: return false
+                val newWebView = WebView(this@MainActivity)
+                newWebView.settings.javaScriptEnabled = true
+                newWebView.webViewClient = webView.webViewClient
+                transport.webView = newWebView
+                resultMsg.sendToTarget()
+                return true
+            }
         }
 
         // === WEB VIEW CLIENT (navegação + ajustes) ===
         webView.webViewClient = object : WebViewClient() {
             override fun shouldOverrideUrlLoading(view: WebView, url: String): Boolean {
                 if (url.startsWith("http://") || url.startsWith("https://")) {
-                    // URLs do nosso sistema: mantem dentro
+                    // Domínios do nosso sistema (Vercel, Convex, Clerk) - sempre dentro
                     val internalDomains = listOf(
+                        // Vercel
                         "manutencao-drab.vercel.app",
+                        "vercel.app",
+                        // Convex
                         "decisive-kiwi-683.convex.cloud",
+                        "convex.cloud",
+                        "convex.dev",
+                        // Clerk (muitos subdomínios)
                         "clerk.accounts.dev",
                         "clerk.com",
-                        "clerk.dev"
+                        "clerk.dev",
+                        "clerk.telemetry.dev",
+                        "clerk-image-resizer.clerk.com",
+                        // Google (reCAPTCHA, fonts)
+                        "google.com",
+                        "googleapis.com",
+                        "gstatic.com",
+                        "recaptcha.net"
                     )
-                    val isInternal = internalDomains.any { url.contains(it) }
+                    val isInternal = internalDomains.any { domain ->
+                        url.contains("://" + domain) || url.contains("." + domain + "/") || url.endsWith("." + domain)
+                    }
                     if (isInternal) {
                         view.loadUrl(url)
                         return false
