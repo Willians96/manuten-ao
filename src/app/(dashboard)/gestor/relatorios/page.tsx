@@ -51,7 +51,7 @@ export default function RelatoriosPage() {
         }
       }
       porTecnico.push({
-        nome: t.nomeDeGuerra,
+        nome: `${t.graduacao} ${t.nomeDeGuerra}`,
         total: meus.length,
         concluido: concluidos.length,
         duracaoMedia: count > 0 ? Math.round(duracaoTotal / count) : 0,
@@ -94,7 +94,7 @@ export default function RelatoriosPage() {
           return {
             titulo: s.titulo,
             data: dataRef,
-            tecnico: tec?.nomeDeGuerra ?? "—",
+            tecnico: tec ? `${tec.graduacao} ${tec.nomeDeGuerra}` : "—",
             duracao,
             local: s.local,
           };

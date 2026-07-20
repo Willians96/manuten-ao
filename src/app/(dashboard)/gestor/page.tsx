@@ -207,7 +207,7 @@ export default function GestorPage() {
                       const tec = (tecnicos ?? []).find((t: any) => t._id === s.tecnicoId);
                       return tec ? (
                         <span style={{ background: "#dbeafe", color: "#1e40af", padding: "2px 6px", borderRadius: 4, fontSize: 11, fontWeight: 600 }}>
-                          👤 {tec.nomeDeGuerra}
+                          👤 {tec.graduacao} {tec.nomeDeGuerra}
                         </span>
                       ) : <span style={{ color: "#9ca3af", fontSize: 11 }}>—</span>;
                     })() : (
@@ -330,7 +330,7 @@ export default function GestorPage() {
                 return [...acc, { tecnico: t, equipe: eq }];
               }, []).map((item: any) => (
                 <div key={item.tecnico._id} style={{ fontSize: 12, padding: "4px 0", borderBottom: "1px solid #f1f5f9" }}>
-                  <strong>{item.equipe?.nome}</strong> — {item.tecnico.nomeDeGuerra} ({item.tecnico.graduacao})
+                  <strong>{item.equipe?.nome}</strong> — {item.tecnico.graduacao} {item.tecnico.nomeDeGuerra}
                 </div>
               ))}
             </div>
@@ -372,21 +372,21 @@ export default function GestorPage() {
                       value={atrTecnicoSel}
                       onChange={(e) => setAtrTecnicoSel(e.target.value)}
                     >
-                      <option value="">👥 Ambos (qualquer um pega)</option>
+                      <option value="">👥 Ambos (qualquer um da equipe pode pegar)</option>
                       {(tecnicos ?? [])
                         .filter((t: any) =>
                           t.equipeId === atrEquipeSel &&
                           t.ativo &&
                           (t.status === "ativo" || !t.status)
                         )
-                        .map((t: any, idx: number) => (
+                        .map((t: any) => (
                           <option key={t._id} value={t._id}>
-                            👤 Técnico {idx + 1} — {t.graduacao} {t.nomeDeGuerra}
+                            👤 {t.graduacao} {t.nomeDeGuerra}
                           </option>
                         ))}
                     </select>
                     <div style={{ fontSize: 11, color: "#6b7280", marginTop: 4 }}>
-                      💡 "Ambos" = qualquer técnico ativo da equipe pega o serviço. "Técnico 1/2" = direciona pra um específico.
+                      💡 "Ambos" = qualquer técnico ativo da equipe pega o serviço. Escolha um específico se for direcionar.
                     </div>
                   </>
                 )}

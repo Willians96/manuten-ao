@@ -153,8 +153,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
           {/* User info (direita) */}
           <div style={{ marginLeft: "auto", fontSize: 12, color: "#6b7280" }}>
-            <strong style={{ color: "#003882" }}>{me?.nomeDeGuerra ?? "—"}</strong>
-            {me?.graduacao && <> · {me.graduacao}</>}
+            <strong style={{ color: "#003882" }}>
+              {me?.graduacao ? `${me.graduacao} ` : ""}{me?.nomeDeGuerra ?? "—"}
+            </strong>
             {me?.secao && <> · {me.secao}</>}
           </div>
         </div>
