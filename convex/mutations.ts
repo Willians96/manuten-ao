@@ -44,6 +44,7 @@ export const listServicos = query({
     const servicos = await q.collect();
 
     // Tecnicos veem só os serviços da própria equipe
+    // EXCETO pausados: pausados aparecem pra QUALQUER equipe (outra equipe pode retomar)
     if (user.role === "tecnico") {
       const tecnico = await ctx.db
         .query("tecnicos")
@@ -53,8 +54,11 @@ export const listServicos = query({
       if (tecnico) {
         return servicos.filter(
           (s) =>
-            s.equipeId === tecnico.equipeId &&
-            (s.status === "aprovado" || s.status === "em_andamento" || s.status === "pausado")
+            // Pausados: qualquer técnico de qualquer equipe vê
+            (s.status === "pausado") ||
+            // Demais status (aprovado, em_andamento): só da própria equipe
+            ((s.status === "aprovado" || s.status === "em_andamento") &&
+             s.equipeId === tecnico.equipeId)
         );
       }
       return [];
@@ -434,13 +438,22 @@ export const retomarServico = mutation({
     const servico = await ctx.db.get(args.servicoId);
     if (!servico) throw new Error("Serviço não encontrado");
 
-    // Pode retomar se: (a) era da equipe original, ou (b) foi reassignado pra esta equipe
-    if (servico.equipeId !== tecnico.equipeId) {
+    // Se NÃO é pausado, mantém regra original: só a equipe responsável pode retomar
+    if (servico.status !== "pausado" && servico.equipeId !== tecnico.equipeId) {
       throw new Error("Serviço não pertence à sua equipe");
     }
 
+    // Servico pausado: qualquer tecnico de qualquer equipe pode retomar
+    // Ao retomar, transfere o servico pra equipe do novo tecnico
+    const transferido = servico.status === "pausado" && servico.equipeId !== tecnico.equipeId;
+    const equipeAnterior = servico.equipeId;
+
     await ctx.db.patch(args.servicoId, {
       status: "em_andamento",
+      tecnicoId: tecnico._id,
+      equipeId: tecnico.equipeId, // transfere pra equipe que está retomando
+      motivoPausa: undefined,
+      pausadoEm: undefined,
       updatedAt: Date.now(),
     });
 
@@ -448,7 +461,9 @@ export const retomarServico = mutation({
       servicoId: args.servicoId,
       tecnicoId: tecnico._id,
       acao: "inicio",
-      observacao: "▶️ Retomado",
+      observacao: transferido
+        ? `▶️ Retomado por outra equipe (anterior: ${equipeAnterior})`
+        : "▶️ Retomado",
       createdAt: Date.now(),
     });
   },

@@ -12,3 +12,5 @@ dist/
 CLERK.txt
 *.pem
 *.key
+
+.vercel

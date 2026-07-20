@@ -166,45 +166,55 @@ export default function TecnicoPage() {
       {/* ── Pausados ───────────────────────────────────────────────────── */}
       <div style={{ marginBottom: 32 }}>
         <h2 style={{ fontSize: 16, fontWeight: 600, marginBottom: 12, color: "#c2410c" }}>
-          ⏸ Pausados ({pausados.length})
+          ⏸ Pausados ({pausados.length}) <span style={{ fontSize: 12, color: "#6b7280", fontWeight: 400 }}>— visíveis pra qualquer equipe</span>
         </h2>
         <div style={{ display: "grid", gap: 12 }}>
-          {pausados.map((s: any) => (
-            <div key={s._id} className="card" style={{ borderLeft: "4px solid #c2410c", background: "#fff7ed" }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12 }}>
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontWeight: 600, fontSize: 15 }}>{s.titulo}</div>
-                  {s.cadastroDireto && s.dadosSolicitante && (
-                    <div style={{ fontSize: 12, background: "#eff6ff", padding: "2px 8px", borderRadius: 4, display: "inline-block", marginTop: 4 }}>
-                      👤 {s.dadosSolicitante.solicitanteGraduacao} {s.dadosSolicitante.solicitanteNomeDeGuerra}
-                    </div>
-                  )}
-                  <div style={{ fontSize: 13, color: "#6b7280", marginTop: 4 }}>📍 {s.local}</div>
-                  {s.motivoPausa && (
-                    <div style={{ fontSize: 12, background: "#fed7aa", padding: "6px 10px", borderRadius: 6, marginTop: 8, color: "#9a3412" }}>
-                      ⏸ Motivo: {s.motivoPausa}
-                    </div>
-                  )}
-                  {s.pausadoEm && (
-                    <div style={{ fontSize: 12, color: "#6b7280", marginTop: 4 }}>
-                      Pausado em: {new Date(s.pausadoEm).toLocaleString("pt-BR")}
-                    </div>
-                  )}
-                </div>
-                <div style={{ display: "flex", flexDirection: "column", gap: 6, alignItems: "flex-end" }}>
-                  <span className="badge" style={{ background: "#fed7aa", color: "#9a3412" }}>Pausado</span>
-                  <button className="btn btn-success" style={{ fontSize: 13, padding: "6px 14px", whiteSpace: "nowrap" }}
-                    onClick={() => handleRetomar(s._id)}>
-                    ▶️ Retomar
-                  </button>
-                  <button className="btn btn-danger" style={{ fontSize: 12, padding: "4px 10px", whiteSpace: "nowrap" }}
-                    onClick={() => { setEncerrarObs(s._id); }}>
-                    ✅ Encerrar
-                  </button>
+          {pausados.map((s: any) => {
+            const eqOrigem = (equipes ?? []).find((e: any) => e._id === s.equipeId);
+            const deOutraEquipe = tecnico && s.equipeId !== tecnico.equipeId;
+            return (
+              <div key={s._id} className="card" style={{ borderLeft: `4px solid ${deOutraEquipe ? "#003882" : "#c2410c"}`, background: "#fff7ed" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12 }}>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontWeight: 600, fontSize: 15 }}>{s.titulo}</div>
+                    {s.cadastroDireto && s.dadosSolicitante && (
+                      <div style={{ fontSize: 12, background: "#eff6ff", padding: "2px 8px", borderRadius: 4, display: "inline-block", marginTop: 4 }}>
+                        👤 {s.dadosSolicitante.solicitanteGraduacao} {s.dadosSolicitante.solicitanteNomeDeGuerra}
+                      </div>
+                    )}
+                    <div style={{ fontSize: 13, color: "#6b7280", marginTop: 4 }}>📍 {s.local}</div>
+                    {deOutraEquipe && (
+                      <div style={{ fontSize: 11, background: "#dbeafe", color: "#1e40af", padding: "3px 8px", borderRadius: 4, display: "inline-block", marginTop: 4, fontWeight: 600 }}>
+                        🔄 Pausado por {eqOrigem?.nome ?? "outra equipe"} — você pode retomar
+                      </div>
+                    )}
+                    {s.motivoPausa && (
+                      <div style={{ fontSize: 12, background: "#fed7aa", padding: "6px 10px", borderRadius: 6, marginTop: 8, color: "#9a3412" }}>
+                        ⏸ Motivo: {s.motivoPausa}
+                      </div>
+                    )}
+                    {s.pausadoEm && (
+                      <div style={{ fontSize: 12, color: "#6b7280", marginTop: 4 }}>
+                        Pausado em: {new Date(s.pausadoEm).toLocaleString("pt-BR")}
+                      </div>
+                    )}
+                  </div>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 6, alignItems: "flex-end" }}>
+                    <span className="badge" style={{ background: "#fed7aa", color: "#9a3412" }}>Pausado</span>
+                    <button className="btn btn-success" style={{ fontSize: 13, padding: "6px 14px", whiteSpace: "nowrap" }}
+                      onClick={() => handleRetomar(s._id)}
+                      title={deOutraEquipe ? "Retomar e transferir para sua equipe" : "Retomar serviço"}>
+                      {deOutraEquipe ? "🤝 Assumir" : "▶️ Retomar"}
+                    </button>
+                    <button className="btn btn-danger" style={{ fontSize: 12, padding: "4px 10px", whiteSpace: "nowrap" }}
+                      onClick={() => { setEncerrarObs(s._id); }}>
+                      ✅ Encerrar
+                    </button>
+                  </div>
                 </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
           {pausados.length === 0 && (
             <p style={{ color: "#6b7280", fontSize: 14 }}>Nenhum serviço pausado.</p>
           )}
