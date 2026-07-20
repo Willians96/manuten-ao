@@ -330,6 +330,49 @@ export const updateUserRole = mutation({
   },
 });
 
+// Excluir usuário PERMANENTEMENTE - SÓ Admin Master
+export const deleteUser = mutation({
+  args: { userId: v.id("users") },
+  handler: async (ctx, args) => {
+    const currentUserId = await getCurrentUserId(ctx);
+    if (!currentUserId) throw new Error("Não autenticado");
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_clerkId", (q) => q.eq("clerkId", currentUserId))
+      .first();
+    if (!user) throw new Error("Não autorizado");
+    if (user.isAdminMaster !== true) {
+      throw new Error("Apenas o Admin Master pode excluir usuários");
+    }
+    const target = await ctx.db.get(args.userId);
+    if (!target) throw new Error("Usuário não encontrado");
+    // Proteções
+    if (target._id === user._id) {
+      throw new Error("Você não pode excluir a si mesmo");
+    }
+    if (target.isAdminMaster) {
+      throw new Error("Não é possível excluir o Admin Master");
+    }
+    // Verifica se tem serviços vinculados
+    const servicos = await ctx.db
+      .query("servicos")
+      .withIndex("by_solicitante", (q) => q.eq("solicitanteId", args.userId))
+      .collect();
+    if (servicos.length > 0) {
+      throw new Error(`Usuário tem ${servicos.length} serviço(s) vinculado(s). Suspenda em vez de excluir.`);
+    }
+    // Verifica se é técnico
+    const tecnicos = await ctx.db
+      .query("tecnicos")
+      .withIndex("by_user", (q) => q.eq("userId", args.userId))
+      .collect();
+    if (tecnicos.length > 0) {
+      throw new Error("Usuário é técnico cadastrado. Exclua-o na página de Equipes primeiro.");
+    }
+    await ctx.db.delete(args.userId);
+  },
+});
+
 export const criarServico = mutation({
   args: {
     titulo: v.string(),

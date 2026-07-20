@@ -21,8 +21,12 @@ type User = {
 export default function AprovarPage() {
   const pendentes = useQuery(api.mutations.pendingUsers);
   const allUsers = useQuery(api.mutations.listAllUsers);
+  const me = useQuery(api.mutations.me);
   const approve = useMutation(api.mutations.approveUser);
   const updateRole = useMutation(api.mutations.updateUserRole);
+  const deleteUserMutation = useMutation(api.mutations.deleteUser);
+
+  const isAdminMaster = me?.isAdminMaster === true;
 
   // role selecionado pra cada user (key = userId)
   const [roles, setRoles] = useState<Record<string, string>>({});
@@ -69,6 +73,22 @@ export default function AprovarPage() {
     }
   }
 
+  async function handleDelete(user: User) {
+    if (!isAdminMaster) {
+      alert("Apenas o Admin Master pode excluir usuários.");
+      return;
+    }
+    const nome = `${user.graduacao ?? ""} ${user.nomeDeGuerra ?? user.name ?? user.email}`.trim();
+    if (!confirm(`⚠️ EXCLUIR PERMANENTEMENTE o usuário "${nome}"?\n\nEsta ação NÃO pode ser desfeita!\n\nSó é possível excluir usuários sem serviços vinculados e que não sejam técnicos cadastrados.`)) return;
+    if (!confirm(`Tem certeza absoluta? Digite OK mentalmente e confirme de novo.\n\nExcluir: ${nome}`)) return;
+    try {
+      await deleteUserMutation({ userId: user._id as any });
+      alert("Usuário excluído.");
+    } catch (e: any) {
+      alert("Erro: " + e.message);
+    }
+  }
+
   // Filtrar por busca
   function matchBusca(u: User): boolean {
     if (!busca.trim()) return true;
@@ -98,7 +118,7 @@ export default function AprovarPage() {
 
   return (
     <div className="page-container">
-      <h1 className="page-title">👥 Gerenciar Usuários</h1>
+      <h1 className="page-title">👥 Gerenciar Usuários {isAdminMaster && <span style={{ fontSize: 14, marginLeft: 12, background: "#f6d700", color: "#003882", padding: "4px 10px", borderRadius: 12, fontWeight: 700 }}>👑 Admin Master</span>}</h1>
 
       {/* Barra de busca + filtro */}
       <div className="card" style={{ marginBottom: 16 }}>
@@ -283,6 +303,21 @@ export default function AprovarPage() {
                             >
                               {u.approved ? "⏸ Suspender" : "▶ Reativar"}
                             </button>
+                            {isAdminMaster && (
+                              <button
+                                style={{
+                                  fontSize: 11, padding: "4px 10px",
+                                  background: "#dc2626", color: "#fff",
+                                  border: "1px solid #dc2626", borderRadius: "var(--radius)",
+                                  cursor: "pointer", fontWeight: 500,
+                                  display: "inline-flex", alignItems: "center", gap: 4
+                                }}
+                                onClick={() => handleDelete(u)}
+                                title="Excluir permanentemente (apenas Admin Master)"
+                              >
+                                🗑 Excluir
+                              </button>
+                            )}
                           </div>
                         )}
                       </td>
