@@ -24,7 +24,12 @@ export default function DownloadPage() {
       <h1 className="page-title">📱 App Android — Manutenção CPI-7</h1>
 
       <div className="card" style={{ marginBottom: 20, textAlign: "center", background: "linear-gradient(135deg, #003882 0%, #001f47 100%)", color: "#fff", border: "none" }}>
-        <div style={{ fontSize: 56, marginBottom: 8 }}>🛠️</div>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src="/escudo.png"
+          alt="Escudo PMESP"
+          style={{ width: 90, height: "auto", marginBottom: 8, display: "block", marginLeft: "auto", marginRight: "auto" }}
+        />
         <h2 style={{ color: "#f6d700", margin: "0 0 8px 0", fontSize: 22 }}>
           Manutenção CPI-7 — Versão {version}
         </h2>
@@ -34,7 +39,7 @@ export default function DownloadPage() {
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 20 }}>
-        {/* QR Code */}
+        {/* QR Code + ícone do app */}
         <div className="card" style={{ textAlign: "center" }}>
           <h3 style={{ fontSize: 14, marginBottom: 12, color: "#003882" }}>📷 Escaneie com o celular</h3>
           <a href={apkDownloadUrl} target="_blank" rel="noopener noreferrer">
@@ -44,9 +49,16 @@ export default function DownloadPage() {
               style={{ width: 200, height: 200, display: "block", margin: "0 auto", border: "1px solid #e2e8f0", borderRadius: 8 }}
             />
           </a>
-          <p style={{ fontSize: 11, color: "#6b7280", marginTop: 8 }}>
-            Abra a câmera do celular e aponte
-          </p>
+          <div style={{ marginTop: 14, padding: 10, background: "#f8fafc", borderRadius: 8 }}>
+            <img
+              src="/escudo.png"
+              alt="Escudo PMESP"
+              style={{ width: 64, height: "auto", display: "block", margin: "0 auto" }}
+            />
+            <p style={{ fontSize: 11, color: "#6b7280", marginTop: 6, marginBottom: 0 }}>
+              Abra a câmera do celular e aponte pro QR
+            </p>
+          </div>
         </div>
 
         {/* Botão de download + info */}
