@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Cores PMESP -->
+    <color name="pmesp_azul">#003882</color>
+    <color name="pmesp_amarelo">#f6d700</color>
+    <color name="pmesp_vermelho">#e30613</color>
+    <color name="pmesp_azul_escuro">#001f47</color>
+
+    <style name="AppTheme" parent="android:Theme.Material.Light" />
+
+    <style name="AppTheme.NoActionBar" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:statusBarColor">@color/pmesp_azul</item>
+        <item name="android:windowBackground">@android:color/white</item>
+    </style>
+</resources>

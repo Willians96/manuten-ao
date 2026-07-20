@@ -13,4 +13,15 @@ CLERK.txt
 *.pem
 *.key
 
+# Android build artifacts
+android/.gradle/
+android/build/
+android/app/build/
+android/local.properties
+android/.idea/
+android/captures/
+android/.cxx/
+*.iml
+.idea/
+
 .vercel
