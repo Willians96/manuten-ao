@@ -296,6 +296,40 @@ export const approveUser = mutation({
   },
 });
 
+// Atualizar role de um usuário já aprovado (e suspender/reativar)
+export const updateUserRole = mutation({
+  args: {
+    userId: v.id("users"),
+    role: v.union(
+      v.literal("solicitante"),
+      v.literal("gestor"),
+      v.literal("tecnico"),
+      v.literal("admin")
+    ),
+    approved: v.optional(v.boolean()),
+  },
+  handler: async (ctx, args) => {
+    const currentUserId = await getCurrentUserId(ctx);
+    if (!currentUserId) throw new Error("Não autenticado");
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_clerkId", (q) => q.eq("clerkId", currentUserId))
+      .first();
+    if (!user || (user.role !== "gestor" && user.role !== "admin")) {
+      throw new Error("Não autorizado");
+    }
+    const target = await ctx.db.get(args.userId);
+    if (!target) throw new Error("Usuário não encontrado");
+    // Não pode rebaixar o próprio admin master (proteção)
+    if (target.isAdminMaster && target._id !== user._id) {
+      throw new Error("Não é possível alterar o Admin Master");
+    }
+    const updates: any = { role: args.role };
+    if (args.approved !== undefined) updates.approved = args.approved;
+    await ctx.db.patch(args.userId, updates);
+  },
+});
+
 export const criarServico = mutation({
   args: {
     titulo: v.string(),
