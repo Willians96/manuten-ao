@@ -56,13 +56,20 @@ class MainActivity : Activity() {
                 .addOnCompleteListener { task ->
                     if (task.isSuccessful) {
                         val token = task.result
-                        // Injeta o token no WebView via JavaScript
+                        // Injeta o token no WebView via JavaScript + salva direto
                         webView?.evaluateJavascript(
-                            "window.__fcmToken = '$token';", null
+                            "window.__fcmToken = '$token'; console.log('FCM token carregado');", null
                         )
+                        android.util.Log.d("MainActivity", "FCM token: ${token.take(20)}...")
+                        // Salva direto no Convex via fetch (sem precisar de JS)
+                        saveFcmTokenDirectly(token)
+                    } else {
+                        android.util.Log.e("MainActivity", "Falha ao pegar FCM token", task.exception)
                     }
                 }
-        } catch (e: Exception) { }
+        } catch (e: Exception) {
+            android.util.Log.e("MainActivity", "Erro FCM", e)
+        }
 
         // Layout: LinearLayout vertical (progress + swipe > webview)
         val rootLayout = LinearLayout(this).apply {
@@ -220,6 +227,37 @@ class MainActivity : Activity() {
             dp.toFloat(),
             resources.displayMetrics
         ).toInt()
+    }
+
+    /**
+     * Salva o FCM token direto via Convex HTTP API
+     * (não precisa de WebView/convex client)
+     */
+    private fun saveFcmTokenDirectly(token: String) {
+        Thread {
+            try {
+                val convexUrl = "https://decisive-kiwi-683.convex.cloud"
+                val url = "$convexUrl/api/mutation"
+                val body = """
+                {
+                  "path": "mutations:saveFcmToken",
+                  "args": {"token": "$token"},
+                  "format": "json"
+                }
+                """.trimIndent()
+
+                val con = java.net.URL(url).openConnection() as java.net.HttpURLConnection
+                con.requestMethod = "POST"
+                con.setRequestProperty("Content-Type", "application/json")
+                con.doOutput = true
+                con.outputStream.use { it.write(body.toByteArray()) }
+
+                val responseCode = con.responseCode
+                android.util.Log.d("MainActivity", "saveFcmToken HTTP $responseCode")
+            } catch (e: Exception) {
+                android.util.Log.e("MainActivity", "Erro ao salvar FCM token", e)
+            }
+        }.start()
     }
 
     companion object {

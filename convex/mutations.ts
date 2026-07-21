@@ -3,8 +3,91 @@ import { Id } from "./_generated/dataModel";
 import { mutation, query, action } from "./_generated/server";
 import { getCurrentUserId } from "./auth";
 
-// ── Helper: envia push notification via FCM HTTP legacy API ─────────────
-// Requer variavel de ambiente FCM_SERVER_KEY (chave legada do Firebase)
+// ── Helper: envia push notification via FCM HTTP v1 API ────────────────
+// Requer variavel de ambiente FCM_SERVICE_ACCOUNT_JSON (JSON da Service Account)
+//
+// Cache simples de access_token (60 min)
+let cachedToken: { token: string; expiresAt: number } | null = null;
+
+async function getAccessToken(): Promise<string | null> {
+  const saJson = process.env.FCM_SERVICE_ACCOUNT_JSON;
+  if (!saJson) {
+    console.warn("FCM_SERVICE_ACCOUNT_JSON nao configurada - push desabilitado");
+    return null;
+  }
+
+  // Usa cache se ainda válido (com 5min de margem)
+  if (cachedToken && cachedToken.expiresAt > Date.now() + 5 * 60 * 1000) {
+    return cachedToken.token;
+  }
+
+  try {
+    const sa = JSON.parse(saJson);
+    const now = Math.floor(Date.now() / 1000);
+    const exp = now + 3600; // 1 hora
+
+    // Header JWT
+    const header = { alg: "RS256", typ: "JWT" };
+    const headerB64 = Buffer.from(JSON.stringify(header))
+      .toString("base64")
+      .replace(/=+$/, "")
+      .replace(/\+/g, "-")
+      .replace(/\//g, "_");
+
+    // Payload JWT (claim set do Google)
+    const payload = {
+      iss: sa.client_email,
+      scope: "https://www.googleapis.com/auth/firebase.messaging",
+      aud: "https://oauth2.googleapis.com/token",
+      iat: now,
+      exp: exp,
+    };
+    const payloadB64 = Buffer.from(JSON.stringify(payload))
+      .toString("base64")
+      .replace(/=+$/, "")
+      .replace(/\+/g, "-")
+      .replace(/\//g, "_");
+
+    // Assinatura RSA-SHA256
+    const crypto = await import("crypto");
+    const sign = crypto.createSign("RSA-SHA256");
+    sign.update(`${headerB64}.${payloadB64}`);
+    sign.end();
+    const signature = sign
+      .sign(sa.private_key)
+      .toString("base64")
+      .replace(/=+$/, "")
+      .replace(/\+/g, "-")
+      .replace(/\//g, "_");
+
+    const jwt = `${headerB64}.${payloadB64}.${signature}`;
+
+    // Troca JWT por access_token
+    const res = await fetch("https://oauth2.googleapis.com/token", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({
+        grant_type: "urn:ietf:params:oauth:grant-type:jwt-bearer",
+        assertion: jwt,
+      }),
+    });
+    const data = await res.json();
+    if (!data.access_token) {
+      console.error("Falha ao obter access_token:", data);
+      return null;
+    }
+
+    cachedToken = {
+      token: data.access_token,
+      expiresAt: Date.now() + (data.expires_in ?? 3600) * 1000,
+    };
+    return data.access_token;
+  } catch (e) {
+    console.error("Erro ao gerar access_token:", e);
+    return null;
+  }
+}
+
 async function sendPushNotification(
   ctx: any,
   tokens: string[],
@@ -13,25 +96,53 @@ async function sendPushNotification(
   url?: string
 ) {
   if (!tokens || tokens.length === 0) return;
-  const serverKey = process.env.FCM_SERVER_KEY;
-  if (!serverKey) {
-    console.warn("FCM_SERVER_KEY nao configurada - push desabilitado");
+
+  const saJson = process.env.FCM_SERVICE_ACCOUNT_JSON;
+  if (!saJson) {
+    console.warn("FCM_SERVICE_ACCOUNT_JSON nao configurada - push desabilitado");
     return;
   }
+
+  const accessToken = await getAccessToken();
+  if (!accessToken) return;
+
+  const sa = JSON.parse(saJson);
+  const projectId = sa.project_id;
+
   for (const token of tokens) {
     try {
-      await fetch("https://fcm.googleapis.com/fcm/send", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `key=${serverKey}`,
-        },
-        body: JSON.stringify({
-          to: token,
-          notification: { title, body, sound: "default" },
-          data: { url: url || "" },
-        }),
-      });
+      const res = await fetch(
+        `https://fcm.googleapis.com/v1/projects/${projectId}/messages:send`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${accessToken}`,
+          },
+          body: JSON.stringify({
+            message: {
+              token,
+              notification: {
+                title,
+                body,
+              },
+              data: {
+                url: url || "",
+              },
+              android: {
+                priority: "HIGH",
+                notification: {
+                  sound: "default",
+                },
+              },
+            },
+          }),
+        }
+      );
+      if (!res.ok) {
+        const err = await res.text();
+        console.error(`FCM erro ${res.status}:`, err);
+      }
     } catch (e) {
       console.error("Erro ao enviar push:", e);
     }
