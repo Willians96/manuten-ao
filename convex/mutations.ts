@@ -544,6 +544,7 @@ export const debugListUsers = query({
       re: u.re,
       approved: u.approved,
       isAdminMaster: u.isAdminMaster,
+      fcmToken: u.fcmToken ?? null, // <- ADICIONADO pra diagnosticar push
       createdAt: u.createdAt,
     }));
   },

@@ -8,7 +8,7 @@ export const dynamic = "force-dynamic";
 
 export default function TecnicoPage() {
   return (
-    <RoleGuard allow={["tecnico"]}>
+    <RoleGuard allow={["tecnico", "admin"]}>
       <TecnicoPageContent />
     </RoleGuard>
   );
@@ -465,8 +465,32 @@ function ServicoCard({ servico: s, onIniciar, onEncerrar, onPausar, showPausar }
 // ── Modal genérico ─────────────────────────────────────────────────────────
 function Modal({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
   return (
-    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 100, padding: 16 }}>
-      <div className="card" style={{ maxWidth: 440, width: "100%" }}>
+    <div
+      onClick={onClose}
+      style={{
+        position: "fixed",
+        top: 0, left: 0, right: 0, bottom: 0,
+        background: "rgba(0,0,0,0.6)",
+        zIndex: 100000, // ACIMA do app-nav (9999) injetado pelo WebView Android
+        overflowY: "auto",
+        WebkitOverflowScrolling: "touch",
+      }}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="card"
+        style={{
+          position: "absolute",
+          top: "50%",
+          left: "50%",
+          transform: "translate(-50%, -50%)",
+          maxWidth: 440,
+          width: "calc(100% - 32px)",
+          maxHeight: "calc(100vh - 32px)",
+          overflowY: "auto",
+          margin: 0,
+        }}
+      >
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
           <h3 style={{ margin: 0 }}>{title}</h3>
           <button onClick={onClose} style={{ background: "none", border: "none", fontSize: 20, cursor: "pointer" }}>✕</button>
