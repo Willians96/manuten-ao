@@ -1,3 +1,4 @@
+import { httpRouter } from "convex/server";
 import { httpAction } from "./_generated/server";
 import { api } from "./_generated/api";
 
@@ -8,7 +9,7 @@ import { api } from "./_generated/api";
  *   1. Android pega o token via FirebaseMessaging.getInstance().token
  *   2. WebView carrega, JS pega Clerk.user.id + window.__fcmToken
  *   3. JS faz POST pra cá com {clerkId, token, appSecret}
- *   4. A action valida secret, chama runQuery(runMutation) e salva fcmToken
+ *   4. A action valida secret, chama runQuery/runMutation e salva fcmToken
  *
  * Por que não usar a mutation saveFcmToken (autenticada)?
  *   - A mutation autenticada exige JWT do Clerk, que só existe no browser
@@ -19,7 +20,7 @@ import { api } from "./_generated/api";
  */
 const APP_SECRET = process.env.FCM_APP_SECRET || "PMESP-FCM-2026-manutencao-drab";
 
-export const saveFcmToken = httpAction(async (ctx, request) => {
+const saveFcmToken = httpAction(async (ctx, request) => {
   // CORS preflight
   if (request.method === "OPTIONS") {
     return new Response(null, {
@@ -33,7 +34,13 @@ export const saveFcmToken = httpAction(async (ctx, request) => {
   }
 
   if (request.method !== "POST") {
-    return new Response("Method not allowed", { status: 405 });
+    return new Response("Method not allowed", {
+      status: 405,
+      headers: {
+        "Access-Control-Allow-Origin": "*",
+        "Content-Type": "application/json",
+      },
+    });
   }
 
   let body: any;
@@ -42,7 +49,10 @@ export const saveFcmToken = httpAction(async (ctx, request) => {
   } catch {
     return new Response(JSON.stringify({ error: "bad json" }), {
       status: 400,
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        "Access-Control-Allow-Origin": "*",
+      },
     });
   }
 
@@ -52,7 +62,10 @@ export const saveFcmToken = httpAction(async (ctx, request) => {
       JSON.stringify({ error: "clerkId and token are required" }),
       {
         status: 400,
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          "Access-Control-Allow-Origin": "*",
+        },
       }
     );
   }
@@ -61,7 +74,10 @@ export const saveFcmToken = httpAction(async (ctx, request) => {
   if (appSecret !== APP_SECRET) {
     return new Response(JSON.stringify({ error: "unauthorized" }), {
       status: 401,
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        "Access-Control-Allow-Origin": "*",
+      },
     });
   }
 
@@ -70,7 +86,10 @@ export const saveFcmToken = httpAction(async (ctx, request) => {
   if (!user) {
     return new Response(JSON.stringify({ error: "user not found" }), {
       status: 404,
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        "Access-Control-Allow-Origin": "*",
+      },
     });
   }
 
@@ -91,3 +110,12 @@ export const saveFcmToken = httpAction(async (ctx, request) => {
     }
   );
 });
+
+const http = httpRouter();
+http.route({
+  path: "/saveFcmToken",
+  method: "POST",
+  handler: saveFcmToken,
+});
+
+export default http;

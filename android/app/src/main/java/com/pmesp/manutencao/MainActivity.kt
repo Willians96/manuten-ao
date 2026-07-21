@@ -280,7 +280,7 @@ class MainActivity : Activity() {
                 var clerkId = clerkUser.id;
                 var appSecret = "PMESP-FCM-2026-manutencao-drab";
 
-                fetch('https://decisive-kiwi-683.convex.cloud/saveFcmToken', {
+                fetch('https://decisive-kiwi-683.convex.site/saveFcmToken', {
                   method: 'POST',
                   headers: { 'Content-Type': 'application/json' },
                   body: JSON.stringify({ clerkId: clerkId, token: token, appSecret: appSecret })
