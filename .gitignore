@@ -29,4 +29,7 @@ android/app/google-services.json
 google-services.json
 google-services.json firebase/
 
+# NOTA: convex/_generated/ é gerado automaticamente pelo Convex CLI
+# MAS precisa ser commitado pro Vercel buildar (o CI não tem `convex dev` rodando)
+
 .vercel
