@@ -79,13 +79,26 @@ export default function AprovarPage() {
       return;
     }
     const nome = `${user.graduacao ?? ""} ${user.nomeDeGuerra ?? user.name ?? user.email}`.trim();
-    if (!confirm(`⚠️ EXCLUIR PERMANENTEMENTE o usuário "${nome}"?\n\nEsta ação NÃO pode ser desfeita!\n\nSó é possível excluir usuários sem serviços vinculados e que não sejam técnicos cadastrados.`)) return;
+    if (!confirm(`⚠️ EXCLUIR PERMANENTEMENTE o usuário "${nome}"?\n\nEsta ação NÃO pode ser desfeita!`)) return;
     if (!confirm(`Tem certeza absoluta? Digite OK mentalmente e confirme de novo.\n\nExcluir: ${nome}`)) return;
     try {
       await deleteUserMutation({ userId: user._id as any });
       alert("Usuário excluído.");
     } catch (e: any) {
-      alert("Erro: " + e.message);
+      // Se der erro de dependência, oferece exclusão em cascata
+      if (e.message && (e.message.includes("serviço") || e.message.includes("técnico"))) {
+        const tipo = e.message.includes("técnico") ? "técnico cadastrado" : "serviço(s) vinculado(s)";
+        if (confirm(`⚠️ O usuário tem ${tipo}.\n\nQuer EXCLUIR EM CASCATA? (apaga o user + serviços + técnicos vinculados juntos)\n\nISTO É IRREVERSÍVEL!`)) {
+          try {
+            await forceDeleteUserMutation({ userId: user._id as any });
+            alert("Usuário e dependências excluídos em cascata.");
+          } catch (e2: any) {
+            alert("Erro no cascade: " + e2.message);
+          }
+        }
+      } else {
+        alert("Erro: " + e.message);
+      }
     }
   }
 

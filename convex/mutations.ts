@@ -410,7 +410,7 @@ export const deleteUser = mutation({
       .withIndex("by_solicitante", (q) => q.eq("solicitanteId", args.userId))
       .collect();
     if (servicos.length > 0) {
-      throw new Error(`Usuário tem ${servicos.length} serviço(s) vinculado(s). Suspenda em vez de excluir.`);
+      throw new Error(`Usuário tem ${servicos.length} serviço(s) vinculado(s). Use "Excluir em cascata" pra apagar tudo junto.`);
     }
     // Verifica se é técnico
     const tecnicos = await ctx.db
@@ -420,6 +420,70 @@ export const deleteUser = mutation({
     if (tecnicos.length > 0) {
       throw new Error("Usuário é técnico cadastrado. Exclua-o na página de Equipes primeiro.");
     }
+    await ctx.db.delete(args.userId);
+  },
+});
+
+// Excluir usuário EM CASCATA - SÓ Admin Master
+// Apaga TUDO do user: serviços onde foi solicitante, técnicos vinculados, e o user
+// (serviços onde o user é TÉCNICO não são apagados - só ficam sem responsável)
+export const forceDeleteUser = mutation({
+  args: { userId: v.id("users") },
+  handler: async (ctx, args) => {
+    const currentUserId = await getCurrentUserId(ctx);
+    if (!currentUserId) throw new Error("Não autenticado");
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_clerkId", (q) => q.eq("clerkId", currentUserId))
+      .first();
+    if (!user) throw new Error("Não autorizado");
+    if (user.isAdminMaster !== true) {
+      throw new Error("Apenas o Admin Master pode excluir usuários");
+    }
+    const target = await ctx.db.get(args.userId);
+    if (!target) throw new Error("Usuário não encontrado");
+    if (target._id === user._id) {
+      throw new Error("Você não pode excluir a si mesmo");
+    }
+    if (target.isAdminMaster) {
+      throw new Error("Não é possível excluir o Admin Master");
+    }
+
+    // 1. Apaga logs de serviços onde o user era técnico
+    const tecnicos = await ctx.db
+      .query("tecnicos")
+      .withIndex("by_user", (q) => q.eq("userId", args.userId))
+      .collect();
+    for (const t of tecnicos) {
+      // serviceLogs tem by_tecnico
+      const logs = await ctx.db
+        .query("serviceLogs")
+        .withIndex("by_tecnico", (q) => q.eq("tecnicoId", t._id))
+        .collect();
+      for (const log of logs) {
+        await ctx.db.delete(log._id);
+      }
+      // Apaga o técnico
+      await ctx.db.delete(t._id);
+    }
+
+    // 2. Apaga serviços onde o user foi solicitante (junto com logs)
+    const servicos = await ctx.db
+      .query("servicos")
+      .withIndex("by_solicitante", (q) => q.eq("solicitanteId", args.userId))
+      .collect();
+    for (const s of servicos) {
+      const logs = await ctx.db
+        .query("serviceLogs")
+        .withIndex("by_servico", (q) => q.eq("servicoId", s._id))
+        .collect();
+      for (const log of logs) {
+        await ctx.db.delete(log._id);
+      }
+      await ctx.db.delete(s._id);
+    }
+
+    // 3. Apaga o user
     await ctx.db.delete(args.userId);
   },
 });
