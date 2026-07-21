@@ -50,19 +50,19 @@ class MainActivity : Activity() {
             }
         }
 
-        // Pega o FCM token e expõe pro JavaScript (vai enviar pro Convex via WebView)
+        // Pega o FCM token e expõe pro JavaScript (vai enviar pro Convex via httpAction)
         try {
             com.google.firebase.messaging.FirebaseMessaging.getInstance().token
                 .addOnCompleteListener { task ->
                     if (task.isSuccessful) {
                         val token = task.result
-                        // Injeta o token no WebView via JavaScript + salva direto
+                        // Injeta o token no WebView via JavaScript
+                        // O JS injetado (FCM_TOKEN_SAVE) vai pegar window.__fcmToken
+                        // e o Clerk.user.id e chamar a httpAction
                         webView?.evaluateJavascript(
-                            "window.__fcmToken = '$token'; console.log('FCM token carregado');", null
+                            "window.__fcmToken = " + jsString(token) + "; console.log('FCM token carregado');", null
                         )
                         android.util.Log.d("MainActivity", "FCM token: ${token.take(20)}...")
-                        // Salva direto no Convex via fetch (sem precisar de JS)
-                        saveFcmTokenDirectly(token)
                     } else {
                         android.util.Log.e("MainActivity", "Falha ao pegar FCM token", task.exception)
                     }
@@ -191,6 +191,8 @@ class MainActivity : Activity() {
                 // Injeta CSS + JS de logout (botão flutuante + item no dropdown)
                 view?.evaluateJavascript(MOBILE_CSS_INJECTION, null)
                 view?.evaluateJavascript(LOGOUT_INJECTION, null)
+                // Salva o FCM token no Convex via httpAction (não precisa de JWT Clerk)
+                view?.evaluateJavascript(FCM_TOKEN_SAVE, null)
             }
         }
 
@@ -230,37 +232,81 @@ class MainActivity : Activity() {
     }
 
     /**
-     * Salva o FCM token direto via Convex HTTP API
-     * (não precisa de WebView/convex client)
+     * Encoda uma string pra ser usada DENTRO de uma string JS injetada.
+     * Escapa: barra invertida, aspas simples, aspas duplas, newline, carriage return.
      */
-    private fun saveFcmTokenDirectly(token: String) {
-        Thread {
-            try {
-                val convexUrl = "https://decisive-kiwi-683.convex.cloud"
-                val url = "$convexUrl/api/mutation"
-                val body = """
-                {
-                  "path": "mutations:saveFcmToken",
-                  "args": {"token": "$token"},
-                  "format": "json"
-                }
-                """.trimIndent()
-
-                val con = java.net.URL(url).openConnection() as java.net.HttpURLConnection
-                con.requestMethod = "POST"
-                con.setRequestProperty("Content-Type", "application/json")
-                con.doOutput = true
-                con.outputStream.use { it.write(body.toByteArray()) }
-
-                val responseCode = con.responseCode
-                android.util.Log.d("MainActivity", "saveFcmToken HTTP $responseCode")
-            } catch (e: Exception) {
-                android.util.Log.e("MainActivity", "Erro ao salvar FCM token", e)
-            }
-        }.start()
+    private fun jsString(s: String): String {
+        return "\"" + s
+            .replace("\\", "\\\\")
+            .replace("\"", "\\\"")
+            .replace("\n", "\\n")
+            .replace("\r", "\\r") + "\""
     }
 
     companion object {
+        // JS injetado no onPageFinished pra salvar o FCM token no Convex via httpAction
+        // Pega o Clerk user.id (do ClerkProvider) e o window.__fcmToken (setado pelo MainActivity
+        // no callback do Firebase) e faz POST pra httpAction saveFcmToken
+        //
+        // Por que httpAction e não mutation?
+        //   - A mutation saveFcmToken exige JWT Clerk
+        //   - No MainActivity não temos o JWT (não é auth de browser)
+        //   - httpAction valida via appSecret compartilhado
+        private const val FCM_TOKEN_SAVE = """
+            (function() {
+              if (window.__pmespFcmSaving) return;
+              window.__pmespFcmSaving = true;
+
+              function trySave() {
+                if (!window.__fcmToken) {
+                  console.log('FCM save: token ainda nao chegou');
+                  return false;
+                }
+                // Pega o Clerk user id (aguarda carregar)
+                var clerkUser = null;
+                if (window.Clerk && window.Clerk.user) {
+                  clerkUser = window.Clerk.user;
+                }
+                if (!clerkUser || !clerkUser.id) {
+                  console.log('FCM save: Clerk.user ainda nao carregou');
+                  return false;
+                }
+
+                // Evita duplicar
+                if (window.__pmespFcmSaved) return true;
+                window.__pmespFcmSaved = true;
+
+                var token = window.__fcmToken;
+                var clerkId = clerkUser.id;
+                var appSecret = "PMESP-FCM-2026-manutencao-drab";
+
+                fetch('https://decisive-kiwi-683.convex.cloud/saveFcmToken', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ clerkId: clerkId, token: token, appSecret: appSecret })
+                })
+                .then(function(res) { return res.text(); })
+                .then(function(text) {
+                  console.log('FCM save OK:', text);
+                })
+                .catch(function(err) {
+                  console.error('FCM save erro:', err);
+                  window.__pmespFcmSaved = false; // permite tentar de novo
+                });
+                return true;
+              }
+
+              // Tenta várias vezes (Clerk pode demorar pra carregar)
+              var attempts = 0;
+              var interval = setInterval(function() {
+                attempts++;
+                if (trySave() || attempts > 30) { // 30 tentativas × 1s = 30s
+                  clearInterval(interval);
+                }
+              }, 1000);
+            })();
+        """
+
         // JS injetado IMEDIATAMENTE quando a página começa a carregar.
         // Sobrescreve window.open() pra chamar o JavaScript Interface (Android.navigateTo)
         // que faz a navegação no WebView principal, evitando popup externa
