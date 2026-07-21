@@ -27,6 +27,8 @@ class MainActivity : Activity() {
     private lateinit var swipeRefresh: SwipeRefreshLayout
     private val APP_URL = "https://manutencao-drab.vercel.app"
 
+    private val NOTIFICATION_PERMISSION_REQUEST = 1001
+
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -36,6 +38,31 @@ class MainActivity : Activity() {
             WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON,
             WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON
         )
+
+        // Pede permissão de notificação (Android 13+)
+        if (android.os.Build.VERSION.SDK_INT >= 33) {
+            if (checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS)
+                != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+                requestPermissions(
+                    arrayOf(android.Manifest.permission.POST_NOTIFICATIONS),
+                    NOTIFICATION_PERMISSION_REQUEST
+                )
+            }
+        }
+
+        // Pega o FCM token e expõe pro JavaScript (vai enviar pro Convex via WebView)
+        try {
+            com.google.firebase.messaging.FirebaseMessaging.getInstance().token
+                .addOnCompleteListener { task ->
+                    if (task.isSuccessful) {
+                        val token = task.result
+                        // Injeta o token no WebView via JavaScript
+                        webView?.evaluateJavascript(
+                            "window.__fcmToken = '$token';", null
+                        )
+                    }
+                }
+        } catch (e: Exception) { }
 
         // Layout: LinearLayout vertical (progress + swipe > webview)
         val rootLayout = LinearLayout(this).apply {

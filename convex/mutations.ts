@@ -1,7 +1,58 @@
-﻿import { v } from "convex/values";
+import { v } from "convex/values";
 import { Id } from "./_generated/dataModel";
-import { mutation, query } from "./_generated/server";
+import { mutation, query, action } from "./_generated/server";
 import { getCurrentUserId } from "./auth";
+
+// ── Helper: envia push notification via FCM HTTP legacy API ─────────────
+// Requer variavel de ambiente FCM_SERVER_KEY (chave legada do Firebase)
+async function sendPushNotification(
+  ctx: any,
+  tokens: string[],
+  title: string,
+  body: string,
+  url?: string
+) {
+  if (!tokens || tokens.length === 0) return;
+  const serverKey = process.env.FCM_SERVER_KEY;
+  if (!serverKey) {
+    console.warn("FCM_SERVER_KEY nao configurada - push desabilitado");
+    return;
+  }
+  for (const token of tokens) {
+    try {
+      await fetch("https://fcm.googleapis.com/fcm/send", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `key=${serverKey}`,
+        },
+        body: JSON.stringify({
+          to: token,
+          notification: { title, body, sound: "default" },
+          data: { url: url || "" },
+        }),
+      });
+    } catch (e) {
+      console.error("Erro ao enviar push:", e);
+    }
+  }
+}
+
+// Salva o FCM token do user (chamado pelo app no login)
+export const saveFcmToken = mutation({
+  args: { token: v.string() },
+  handler: async (ctx, args) => {
+    const userId = await getCurrentUserId(ctx);
+    if (!userId) return;
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_clerkId", (q) => q.eq("clerkId", userId))
+      .first();
+    if (!user) return;
+    await ctx.db.patch(user._id, { fcmToken: args.token });
+  },
+});
+
 
 // ── Queries ──────────────────────────────────────────────────────────────
 
@@ -396,7 +447,7 @@ export const criarServico = mutation({
 
     if (!user || !user.approved) throw new Error("Usuário não aprovado");
 
-    return await ctx.db.insert("servicos", {
+    const newId = await ctx.db.insert("servicos", {
       solicitanteId: user._id,
       titulo: args.titulo,
       descricao: args.descricao,
@@ -405,6 +456,27 @@ export const criarServico = mutation({
       status: "pendente",
       createdAt: Date.now(),
     });
+
+    // PUSH: notifica todos os gestores
+    const gestores = await ctx.db
+      .query("users")
+      .withIndex("by_role", (q) => q.eq("role", "gestor"))
+      .collect();
+    const admins = await ctx.db
+      .query("users")
+      .withIndex("by_role", (q) => q.eq("role", "admin"))
+      .collect();
+    const tokens = [...gestores, ...admins]
+      .map((u) => u.fcmToken)
+      .filter((t): t is string => !!t);
+    await sendPushNotification(
+      ctx, tokens,
+      "🔔 Novo serviço aguardando aprovação",
+      `${user.graduacao ?? ""} ${user.nomeDeGuerra ?? user.name}: ${args.titulo}`,
+      "/gestor"
+    );
+
+    return newId;
   },
 });
 
@@ -444,6 +516,35 @@ export const atribuirServico = mutation({
       status: novoStatus as any,
       updatedAt: Date.now(),
     });
+
+    // PUSH: notifica o técnico (se específico) ou todos da equipe
+    const tokens: string[] = [];
+    if (args.tecnicoId) {
+      const tec = await ctx.db.get(args.tecnicoId);
+      if (tec) {
+        const userTec = await ctx.db.get(tec.userId);
+        if (userTec?.fcmToken) tokens.push(userTec.fcmToken);
+      }
+    } else {
+      // Notifica todos os técnicos ativos da equipe
+      const tecs = await ctx.db
+        .query("tecnicos")
+        .withIndex("by_equipe", (q) => q.eq("equipeId", args.equipeId))
+        .collect();
+      for (const t of tecs) {
+        if (t.ativo && (t.status === "ativo" || !t.status)) {
+          const u = await ctx.db.get(t.userId);
+          if (u?.fcmToken) tokens.push(u.fcmToken);
+        }
+      }
+    }
+    const equipe = await ctx.db.get(args.equipeId);
+    await sendPushNotification(
+      ctx, tokens,
+      "🔧 Novo serviço atribuído",
+      `${servico.titulo} — ${equipe?.nome ?? "equipe"}`,
+      "/tecnico"
+    );
   },
 });
 
@@ -625,6 +726,35 @@ export const encerrarServico = mutation({
       observacao: args.observacao,
       createdAt: Date.now(),
     });
+
+    // PUSH: notifica o gestor e o solicitante
+    const servico = await ctx.db.get(args.servicoId);
+    if (servico) {
+      const tokens: string[] = [];
+      // Gestores
+      const gestores = await ctx.db
+        .query("users")
+        .withIndex("by_role", (q) => q.eq("role", "gestor"))
+        .collect();
+      const admins = await ctx.db
+        .query("users")
+        .withIndex("by_role", (q) => q.eq("role", "admin"))
+        .collect();
+      for (const u of [...gestores, ...admins]) {
+        if (u.fcmToken) tokens.push(u.fcmToken);
+      }
+      // Solicitante
+      if (servico.solicitanteId) {
+        const sol = await ctx.db.get(servico.solicitanteId);
+        if (sol?.fcmToken) tokens.push(sol.fcmToken);
+      }
+      await sendPushNotification(
+        ctx, tokens,
+        "✅ Serviço concluído",
+        `${servico.titulo} — por ${tecnico.graduacao} ${tecnico.nomeDeGuerra}`,
+        "/gestor"
+      );
+    }
   },
 });
 

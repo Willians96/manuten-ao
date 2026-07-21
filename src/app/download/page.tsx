@@ -5,10 +5,10 @@ export const dynamic = "force-dynamic";
 
 export default function DownloadPage() {
   const [appUrl, setAppUrl] = useState("https://manutencao-drab.vercel.app");
-  const apkFileName = "manutencao-cpi7-v1.0.15.apk";
+  const apkFileName = "manutencao-cpi7-v1.0.16.apk";
   const apkDownloadUrl = `${appUrl}/apk/${apkFileName}`;
-  const apkSize = "3.2 MB";
-  const version = "1.0.15";
+  const apkSize = "3.9 MB";
+  const version = "1.0.16";
 
   useEffect(() => {
     if (typeof window !== "undefined") {

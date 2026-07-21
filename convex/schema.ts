@@ -21,6 +21,7 @@ export default defineSchema({
     secao: v.optional(v.string()),
     approved: v.boolean(), // false = aguardando aprovação do gestor
     isAdminMaster: v.optional(v.boolean()), // true só pro primeiro admin do sistema
+    fcmToken: v.optional(v.string()), // token Firebase Cloud Messaging pra push
     createdAt: v.number(),
   })
     .index("by_clerkId", ["clerkId"])
