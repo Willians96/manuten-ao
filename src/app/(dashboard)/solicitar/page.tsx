@@ -2,10 +2,19 @@
 import { useQuery, useMutation } from "convex/react";
 import { api } from "../../../../convex/_generated/api";
 import { useState } from "react";
+import { RoleGuard } from "../../../components/RoleGuard";
 
 export const dynamic = "force-dynamic";
 
 export default function SolicitarPage() {
+  return (
+    <RoleGuard allow={["solicitante", "gestor", "admin", "tecnico"]}>
+      <SolicitarPageContent />
+    </RoleGuard>
+  );
+}
+
+function SolicitarPageContent() {
   const meusServicos = useQuery(api.mutations.listServicos, {});
   const criar = useMutation(api.mutations.criarServico);
 

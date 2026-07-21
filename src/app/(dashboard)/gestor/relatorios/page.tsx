@@ -4,10 +4,19 @@ import { useQuery } from "convex/react";
 import { api } from "../../../../../convex/_generated/api";
 import { useMemo } from "react";
 import * as XLSX from "xlsx";
+import { RoleGuard } from "../../../../components/RoleGuard";
 
 export const dynamic = "force-dynamic";
 
 export default function RelatoriosPage() {
+  return (
+    <RoleGuard allow={["gestor", "admin"]}>
+      <RelatoriosPageContent />
+    </RoleGuard>
+  );
+}
+
+function RelatoriosPageContent() {
   const stats = useQuery(api.mutations.dashboardStats);
   const servicos = useQuery(api.mutations.listServicos, {});
   const equipes = useQuery(api.mutations.listEquipes);

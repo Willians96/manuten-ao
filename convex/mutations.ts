@@ -417,6 +417,27 @@ export const deleteUser = mutation({
   },
 });
 
+// Debug: lista todos os users (apenas pra diagnóstico)
+export const debugListUsers = query({
+  args: {},
+  handler: async (ctx) => {
+    const users = await ctx.db.query("users").collect();
+    return users.map((u) => ({
+      _id: u._id,
+      clerkId: u.clerkId,
+      email: u.email,
+      name: u.name,
+      role: u.role,
+      graduacao: u.graduacao,
+      nomeDeGuerra: u.nomeDeGuerra,
+      re: u.re,
+      approved: u.approved,
+      isAdminMaster: u.isAdminMaster,
+      createdAt: u.createdAt,
+    }));
+  },
+});
+
 // Excluir usuário EM CASCATA - SÓ Admin Master
 // Apaga TUDO do user: serviços onde foi solicitante, técnicos vinculados, e o user
 // (serviços onde o user é TÉCNICO não são apagados - só ficam sem responsável)

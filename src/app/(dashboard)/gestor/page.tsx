@@ -3,10 +3,19 @@ import { useQuery, useMutation } from "convex/react";
 import { api } from "../../../../convex/_generated/api";
 import { useState } from "react";
 import Link from "next/link";
+import { RoleGuard } from "../../../components/RoleGuard";
 
 export const dynamic = "force-dynamic";
 
 export default function GestorPage() {
+  return (
+    <RoleGuard allow={["gestor", "admin"]}>
+      <GestorPageContent />
+    </RoleGuard>
+  );
+}
+
+function GestorPageContent() {
   const stats = useQuery(api.mutations.dashboardStats);
   const servicos = useQuery(api.mutations.listServicos, {});
   const equipes = useQuery(api.mutations.listEquipes);

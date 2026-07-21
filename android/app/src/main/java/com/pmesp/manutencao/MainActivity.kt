@@ -181,8 +181,9 @@ class MainActivity : Activity() {
                 progressBar.visibility = View.GONE
                 swipeRefresh.isRefreshing = false
 
-                // Injeta CSS pra forçar layout mobile + reaplica navegação override
+                // Injeta CSS + JS de logout (botão flutuante + item no dropdown)
                 view?.evaluateJavascript(MOBILE_CSS_INJECTION, null)
+                view?.evaluateJavascript(LOGOUT_INJECTION, null)
             }
         }
 
@@ -259,6 +260,63 @@ class MainActivity : Activity() {
                   form.target = '_self';
                 }
               }, true);
+            })();
+        """
+
+        // JS injetado DEPOIS (no onPageFinished) que adiciona o item "Sair" no dropdown
+        // do app pra fazer logout via Clerk
+        private const val LOGOUT_INJECTION = """
+            (function() {
+              function addLogoutOption() {
+                if (document.getElementById('pmesp-logout-marker')) return;
+
+                // Espera o dropdown do app estar no DOM
+                var nav = document.getElementById('pmesp-app-nav-select');
+                if (!nav) return false;
+
+                // Cria um option "Sair" e adiciona no dropdown
+                var sairOption = document.createElement('option');
+                sairOption.id = 'pmesp-logout-marker';
+                sairOption.value = '__logout__';
+                sairOption.textContent = '🚪 Sair do sistema';
+                nav.appendChild(sairOption);
+
+                // Handler: quando seleciona "Sair", chama Clerk.signOut()
+                nav.addEventListener('change', function() {
+                  if (this.value === '__logout__') {
+                    // Reseta o select pra opção anterior
+                    this.value = '';
+                    // Tenta usar o Clerk JS API
+                    if (window.Clerk && window.Clerk.signOut) {
+                      window.Clerk.signOut().then(function() {
+                        window.location.reload();
+                      }).catch(function(e) {
+                        // Fallback: força reload + clear cookies
+                        document.cookie.split(";").forEach(function(c) {
+                          document.cookie = c.replace(/^ +/, "").replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/");
+                        });
+                        window.location.href = '/';
+                      });
+                    } else {
+                      // Fallback: vai pra raiz que mostra tela de login
+                      window.location.href = '/';
+                    }
+                  }
+                });
+
+                return true;
+              }
+
+              // Tenta adicionar imediatamente
+              if (!addLogoutOption()) {
+                // Se o dropdown não tá pronto ainda, espera ele aparecer
+                var observer = new MutationObserver(function() {
+                  if (addLogoutOption()) {
+                    observer.disconnect();
+                  }
+                });
+                observer.observe(document.body, { childList: true, subtree: true });
+              }
             })();
         """
 

@@ -2,8 +2,17 @@
 import { useQuery, useMutation } from "convex/react";
 import { api } from "../../../../../convex/_generated/api";
 import { useState, useMemo } from "react";
+import { RoleGuard } from "../../../../components/RoleGuard";
 
 export const dynamic = "force-dynamic";
+
+export default function AprovarPage() {
+  return (
+    <RoleGuard allow={["gestor", "admin"]}>
+      <AprovarPageContent />
+    </RoleGuard>
+  );
+}
 
 type User = {
   _id: string;
@@ -18,7 +27,7 @@ type User = {
   isAdminMaster?: boolean;
 };
 
-export default function AprovarPage() {
+function AprovarPageContent() {
   const pendentes = useQuery(api.mutations.pendingUsers);
   const allUsers = useQuery(api.mutations.listAllUsers);
   const me = useQuery(api.mutations.me);

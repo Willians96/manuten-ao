@@ -1,9 +1,18 @@
-﻿"use client";
+"use client";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "../../../../../convex/_generated/api";
 import { useState } from "react";
+import { RoleGuard } from "../../../../components/RoleGuard";
 
 export const dynamic = "force-dynamic";
+
+export default function EquipesPage() {
+  return (
+    <RoleGuard allow={["gestor", "admin"]}>
+      <EquipesPageContent />
+    </RoleGuard>
+  );
+}
 
 interface Tecnico {
   _id: string;
@@ -17,7 +26,7 @@ interface Tecnico {
   user?: { clerkId?: string };
 }
 
-export default function EquipesPage() {
+function EquipesPageContent() {
   const equipes = useQuery(api.mutations.listEquipes, {});
   const tecnicos = useQuery(api.mutations.listTecnicos, {});
   const criarEquipe = useMutation(api.mutations.criarEquipe);

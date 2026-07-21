@@ -2,10 +2,19 @@
 import { useQuery, useMutation } from "convex/react";
 import { api } from "../../../../convex/_generated/api";
 import { useState } from "react";
+import { RoleGuard } from "../../../components/RoleGuard";
 
 export const dynamic = "force-dynamic";
 
 export default function TecnicoPage() {
+  return (
+    <RoleGuard allow={["tecnico"]}>
+      <TecnicoPageContent />
+    </RoleGuard>
+  );
+}
+
+function TecnicoPageContent() {
   const servicos = useQuery(api.mutations.listServicos, {});
   const equipes = useQuery(api.mutations.listEquipes);
   const tecnicos = useQuery(api.mutations.listTecnicos, {});
