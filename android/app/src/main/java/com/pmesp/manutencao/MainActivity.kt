@@ -33,11 +33,9 @@ class MainActivity : Activity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // Manter tela ligada
-        window.setFlags(
-            WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON,
-            WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON
-        )
+        // Não mantém tela ligada direto - deixa o sistema entrar em proteção
+        // quando o usuário não interagir. Usuário pode tocar a tela pra acender.
+        // (Removido FLAG_KEEP_SCREEN_ON a pedido do William - tela 2026-07-21)
 
         // Pede permissão de notificação (Android 13+)
         if (android.os.Build.VERSION.SDK_INT >= 33) {
@@ -56,13 +54,13 @@ class MainActivity : Activity() {
                 .addOnCompleteListener { task ->
                     if (task.isSuccessful) {
                         val token = task.result
-                        // Injeta o token no WebView via JavaScript
-                        // O JS injetado (FCM_TOKEN_SAVE) vai pegar window.__fcmToken
-                        // e o Clerk.user.id e chamar a httpAction
-                        webView?.evaluateJavascript(
-                            "window.__fcmToken = " + jsString(token) + "; console.log('FCM token carregado');", null
-                        )
-                        android.util.Log.d("MainActivity", "FCM token: ${token.take(20)}...")
+                        android.util.Log.d("MainActivity", "FCM token obtido: ${token.take(20)}...")
+                        // Garante que o WebView já existe antes de injetar
+                        if (webView != null) {
+                            webView.evaluateJavascript(
+                                "window.__fcmToken = " + jsString(token) + "; console.log('FCM: token injetado no window');", null
+                            )
+                        }
                     } else {
                         android.util.Log.e("MainActivity", "Falha ao pegar FCM token", task.exception)
                     }
@@ -256,10 +254,11 @@ class MainActivity : Activity() {
             (function() {
               if (window.__pmespFcmSaving) return;
               window.__pmespFcmSaving = true;
+              console.log('[FCM] Script FCM_TOKEN_SAVE injetado');
 
-              function trySave() {
+              function trySave(reason) {
+                console.log('[FCM] trySave(' + reason + ') - token=' + (window.__fcmToken ? 'PRESENTE' : 'AUSENTE'));
                 if (!window.__fcmToken) {
-                  console.log('FCM save: token ainda nao chegou');
                   return false;
                 }
                 // Pega o Clerk user id (aguarda carregar)
@@ -267,30 +266,37 @@ class MainActivity : Activity() {
                 if (window.Clerk && window.Clerk.user) {
                   clerkUser = window.Clerk.user;
                 }
+                console.log('[FCM] Clerk=' + (window.Clerk ? 'OK' : 'AUSENTE') + ', user=' + (clerkUser ? clerkUser.id : 'AUSENTE'));
                 if (!clerkUser || !clerkUser.id) {
-                  console.log('FCM save: Clerk.user ainda nao carregou');
                   return false;
                 }
 
                 // Evita duplicar
-                if (window.__pmespFcmSaved) return true;
+                if (window.__pmespFcmSaved) {
+                  console.log('[FCM] ja salvo antes, pulando');
+                  return true;
+                }
                 window.__pmespFcmSaved = true;
 
                 var token = window.__fcmToken;
                 var clerkId = clerkUser.id;
                 var appSecret = "PMESP-FCM-2026-manutencao-drab";
 
+                console.log('[FCM] Enviando POST /saveFcmToken...');
                 fetch('https://decisive-kiwi-683.convex.site/saveFcmToken', {
                   method: 'POST',
                   headers: { 'Content-Type': 'application/json' },
                   body: JSON.stringify({ clerkId: clerkId, token: token, appSecret: appSecret })
                 })
-                .then(function(res) { return res.text(); })
+                .then(function(res) {
+                  console.log('[FCM] HTTP status=' + res.status);
+                  return res.text();
+                })
                 .then(function(text) {
-                  console.log('FCM save OK:', text);
+                  console.log('[FCM] Resposta: ' + text);
                 })
                 .catch(function(err) {
-                  console.error('FCM save erro:', err);
+                  console.error('[FCM] Erro: ' + err);
                   window.__pmespFcmSaved = false; // permite tentar de novo
                 });
                 return true;
@@ -300,8 +306,10 @@ class MainActivity : Activity() {
               var attempts = 0;
               var interval = setInterval(function() {
                 attempts++;
-                if (trySave() || attempts > 30) { // 30 tentativas × 1s = 30s
+                var ok = trySave('tick#' + attempts);
+                if (ok || attempts > 30) { // 30 tentativas × 1s = 30s
                   clearInterval(interval);
+                  console.log('[FCM] Parou de tentar (attempts=' + attempts + ', ok=' + ok + ')');
                 }
               }, 1000);
             })();
