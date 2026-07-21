@@ -50,8 +50,16 @@ function RoleRouter() {
   const router = useRouter();
   const user = useQuery(api.mutations.me);
   const [mounted, setMounted] = useState(false);
+  const [stuck, setStuck] = useState(false);
 
   useEffect(() => { setMounted(true); }, []);
+
+  // Se ficar "Redirecionando..." por mais de 5s, mostra opção de refresh
+  useEffect(() => {
+    if (!mounted) return;
+    const timer = setTimeout(() => setStuck(true), 5000);
+    return () => clearTimeout(timer);
+  }, [mounted]);
 
   useEffect(() => {
     if (!mounted) return;
@@ -86,12 +94,42 @@ function RoleRouter() {
       display: "flex",
       alignItems: "center",
       justifyContent: "center",
+      flexDirection: "column",
+      gap: 16,
       background: "#f4f6f9",
       color: "#003882",
-      fontSize: 16,
-      fontWeight: 500
+      padding: 16,
+      textAlign: "center"
     }}>
-      Redirecionando…
+      <div style={{ fontSize: 16, fontWeight: 500 }}>
+        {user === undefined ? "Carregando dados do usuário..." : "Redirecionando…"}
+      </div>
+      {stuck && user !== undefined && (
+        <div className="card" style={{ maxWidth: 400 }}>
+          <div style={{ fontSize: 48, marginBottom: 8 }}>⏱️</div>
+          <h3 style={{ color: "#003882", marginBottom: 8 }}>Demora pra redirecionar?</h3>
+          <p style={{ fontSize: 13, color: "#6b7280", marginBottom: 16 }}>
+            Pode ser que sua role tenha sido alterada pelo gestor. Toque em "Atualizar" pra recarregar.
+          </p>
+          <div style={{ display: "flex", gap: 8, justifyContent: "center", flexWrap: "wrap" }}>
+            <button
+              className="btn btn-primary"
+              onClick={() => window.location.reload()}
+            >
+              🔄 Atualizar página
+            </button>
+            <button
+              className="btn btn-outline"
+              onClick={async () => {
+                await fetch("/api/sign-out", { method: "POST" });
+                window.location.href = "/";
+              }}
+            >
+              🚪 Sair e entrar de novo
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

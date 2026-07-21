@@ -24,6 +24,7 @@ export default function PendentePage() {
     if (!isLoaded || !me) return;
     if (me.approved) {
       if (me.role === "solicitante") router.replace("/solicitar");
+      else if (me.role === "tecnico") router.replace("/tecnico");
       else router.replace("/gestor");
     }
   }, [isLoaded, me, router]);
