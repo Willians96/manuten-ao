@@ -17,10 +17,20 @@ android {
         versionName "1.0.21"
     }
 
+    signingConfigs {
+        release {
+            storeFile file("pmesp-release.jks")
+            storePassword "PMESP2026"
+            keyAlias "pmesp-manutencao"
+            keyPassword "PMESP2026"
+        }
+    }
+
     buildTypes {
         release {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+            signingConfig signingConfigs.release
         }
         debug {
             minifyEnabled false
