@@ -878,6 +878,9 @@ export const criarServicoDireto = mutation({
     // datas de execução
     dataInicioExec: v.optional(v.string()),
     dataFimExec: v.optional(v.string()),
+    // pra admin master escolher equipe + técnico quando não tem vínculo
+    equipeId: v.optional(v.id("equipes")),
+    tecnicoId: v.optional(v.id("tecnicos")),
   },
   handler: async (ctx, args) => {
     const userId = await getCurrentUserId(ctx);
@@ -888,14 +891,31 @@ export const criarServicoDireto = mutation({
       .withIndex("by_clerkId", (q) => q.eq("clerkId", userId))
       .first();
 
-    if (!user || user.role !== "tecnico") throw new Error("Apenas técnicos podem fazer cadastro direto");
+    if (!user) throw new Error("Não autorizado");
+    if (user.role !== "tecnico" && user.role !== "admin") {
+      throw new Error("Apenas técnicos e Admin Master podem fazer cadastro direto");
+    }
 
-    const tecnico = await ctx.db
-      .query("tecnicos")
-      .withIndex("by_user", (q) => q.eq("userId", user._id))
-      .first();
+    // Pra técnico: usa o próprio vínculo
+    // Pra admin: usa o tecnicoId/equipeId passado
+    let equipeIdFinal: any;
+    let tecnicoIdFinal: any;
 
-    if (!tecnico) throw new Error("Técnico não cadastrado em nenhuma equipe");
+    if (user.role === "tecnico") {
+      const tecnico = await ctx.db
+        .query("tecnicos")
+        .withIndex("by_user", (q) => q.eq("userId", user._id))
+        .first();
+      if (!tecnico) throw new Error("Técnico não cadastrado em nenhuma equipe");
+      equipeIdFinal = tecnico.equipeId;
+      tecnicoIdFinal = tecnico._id;
+    } else {
+      // admin master
+      if (!args.equipeId) throw new Error("Admin Master precisa informar a equipe");
+      if (!args.tecnicoId) throw new Error("Admin Master precisa informar o técnico");
+      equipeIdFinal = args.equipeId;
+      tecnicoIdFinal = args.tecnicoId;
+    }
 
     // Se forneceu dataFim → já nasce concluído
     const status = args.dataFimExec ? "concluido" : "em_andamento";
@@ -907,8 +927,8 @@ export const criarServicoDireto = mutation({
       local: args.local,
       urgencia: args.urgencia,
       status: status as any,
-      equipeId: tecnico.equipeId,
-      tecnicoId: tecnico._id,
+      equipeId: equipeIdFinal,
+      tecnicoId: tecnicoIdFinal,
       cadastroDireto: true,
       dadosSolicitante: {
         nome: args.solicitanteNome,
@@ -927,7 +947,7 @@ export const criarServicoDireto = mutation({
     if (args.dataInicioExec) {
       await ctx.db.insert("serviceLogs", {
         servicoId,
-        tecnicoId: tecnico._id,
+        tecnicoId: tecnicoIdFinal,
         acao: "inicio",
         observacao: `Cadastro direto — início: ${args.dataInicioExec}`,
         createdAt: new Date(args.dataInicioExec).getTime(),
@@ -938,7 +958,7 @@ export const criarServicoDireto = mutation({
     if (args.dataFimExec) {
       await ctx.db.insert("serviceLogs", {
         servicoId,
-        tecnicoId: tecnico._id,
+        tecnicoId: tecnicoIdFinal,
         acao: "fim",
         observacao: `Cadastro direto — fim: ${args.dataFimExec}`,
         createdAt: new Date(args.dataFimExec).getTime(),

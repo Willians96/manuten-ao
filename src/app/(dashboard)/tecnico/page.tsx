@@ -126,10 +126,11 @@ function TecnicoPageContent() {
           <form onSubmit={handleCadastroDireto}>
             <div style={{ background: "#f8fafc", padding: 16, borderRadius: 8, marginBottom: 16 }}>
               <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 12, color: "#003882" }}>👤 Dados do Solicitante</div>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12 }}>
+              {/* Mobile-first: 1 coluna no celular, 3 no desktop */}
+              <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 12 }} className="cadastro-grid">
                 <div className="form-group" style={{ margin: 0 }}>
                   <label>Graduação</label>
-                  <select value={cr.solicitanteGraduacao} onChange={set("solicitanteGraduacao")} required>
+                  <select value={cr.solicitanteGraduacao} onChange={set("solicitanteGraduacao")} required style={{ fontSize: 16, padding: "12px 14px" }}>
                     <option value="">Selecione...</option>
                     {["Sd","Cb","3º Sgt","2º Sgt","1º Sgt","Asp","2º Ten","1º Ten","Cap","Maj","Ten Cel","Cel","Aluno","Civil"].map(g => (
                       <option key={g} value={g}>{g}</option>
@@ -138,34 +139,105 @@ function TecnicoPageContent() {
                 </div>
                 <div className="form-group" style={{ margin: 0 }}>
                   <label>Nome de Guerra</label>
-                  <input type="text" value={cr.solicitanteNomeDeGuerra} onChange={set("solicitanteNomeDeGuerra")} placeholder="Ex: SILVA" required />
+                  <input type="text" value={cr.solicitanteNomeDeGuerra} onChange={set("solicitanteNomeDeGuerra")} placeholder="Ex: SILVA" required style={{ fontSize: 16, padding: "12px 14px" }} />
                 </div>
                 <div className="form-group" style={{ margin: 0 }}>
                   <label>RE</label>
-                  <input type="text" value={cr.solicitanteRe} onChange={set("solicitanteRe")} placeholder="Ex: 123.456-7" required />
+                  <input type="text" value={cr.solicitanteRe} onChange={set("solicitanteRe")} placeholder="Ex: 123.456-7" required style={{ fontSize: 16, padding: "12px 14px" }} />
                 </div>
-                <div className="form-group" style={{ margin: 0, gridColumn: "1 / -1" }}>
+                <div className="form-group" style={{ margin: 0 }}>
                   <label>Seção / Local</label>
-                  <input type="text" value={cr.solicitanteSecao} onChange={set("solicitanteSecao")} placeholder="Ex: Almoxarifado, Administrativo..." required />
+                  <input type="text" value={cr.solicitanteSecao} onChange={set("solicitanteSecao")} placeholder="Ex: Almoxarifado" required style={{ fontSize: 16, padding: "12px 14px" }} />
                 </div>
               </div>
             </div>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-              <div className="form-group"><label>Título do Serviço *</label><input type="text" value={cr.titulo} onChange={set("titulo")} placeholder="Ex: Troca de torneira" required /></div>
-              <div className="form-group"><label>Local *</label><input type="text" value={cr.local} onChange={set("local")} placeholder="Ex: Banheiro 2º andar, Ala B" required /></div>
-              <div className="form-group"><label>Urgência</label><select value={cr.urgencia} onChange={set("urgencia")}><option value="baixa">Baixa</option><option value="media">Média</option><option value="alta">Alta</option><option value="critica">Crítica</option></select></div>
-              <div className="form-group"><label>Descrição</label><input type="text" value={cr.descricao} onChange={set("descricao")} placeholder="Detalhes do serviço..." /></div>
+
+            {/* Equipe + Técnico - só aparece pro Admin Master */}
+            {me?.role === "admin" && (
+              <div style={{ background: "#fef3c7", border: "1px solid #fde68a", padding: 16, borderRadius: 8, marginBottom: 16 }}>
+                <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 12, color: "#92400e" }}>👑 Atribuir à Equipe + Técnico (Admin Master)</div>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 12 }} className="cadastro-grid">
+                  <div className="form-group" style={{ margin: 0 }}>
+                    <label>Equipe</label>
+                    <select
+                      value={(cr as any).equipeId ?? ""}
+                      onChange={(e) => {
+                        setCr({ ...cr, equipeId: e.target.value, tecnicoId: "" } as any)
+                      }}
+                      required
+                      style={{ fontSize: 16, padding: "12px 14px" }}
+                    >
+                      <option value="">Selecione a equipe...</option>
+                      {(equipes ?? []).map((eq: any) => (
+                        <option key={eq._id} value={eq._id}>{eq.nome}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="form-group" style={{ margin: 0 }}>
+                    <label>Técnico</label>
+                    <select
+                      value={(cr as any).tecnicoId ?? ""}
+                      onChange={(e) => setCr({ ...cr, tecnicoId: e.target.value } as any)}
+                      required
+                      style={{ fontSize: 16, padding: "12px 14px" }}
+                    >
+                      <option value="">Selecione o técnico...</option>
+                      {(tecnicos ?? [])
+                        .filter((t: any) => t.equipeId === (cr as any).equipeId && t.ativo)
+                        .map((t: any) => (
+                          <option key={t._id} value={t._id}>
+                            {t.graduacao} {t.nomeDeGuerra}
+                          </option>
+                        ))}
+                    </select>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Dados do serviço - também 1 coluna no mobile */}
+            <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 12, color: "#003882" }}>🔧 Dados do Serviço</div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 12 }} className="cadastro-grid">
+              <div className="form-group" style={{ margin: 0 }}>
+                <label>Título do Serviço *</label>
+                <input type="text" value={cr.titulo} onChange={set("titulo")} placeholder="Ex: Troca de torneira" required style={{ fontSize: 16, padding: "12px 14px" }} />
+              </div>
+              <div className="form-group" style={{ margin: 0 }}>
+                <label>Local *</label>
+                <input type="text" value={cr.local} onChange={set("local")} placeholder="Ex: Banheiro 2º andar" required style={{ fontSize: 16, padding: "12px 14px" }} />
+              </div>
+              <div className="form-group" style={{ margin: 0 }}>
+                <label>Urgência</label>
+                <select value={cr.urgencia} onChange={set("urgencia")} style={{ fontSize: 16, padding: "12px 14px" }}>
+                  <option value="baixa">Baixa</option>
+                  <option value="media">Média</option>
+                  <option value="alta">Alta</option>
+                  <option value="critica">Crítica</option>
+                </select>
+              </div>
+              <div className="form-group" style={{ margin: 0 }}>
+                <label>Descrição</label>
+                <input type="text" value={cr.descricao} onChange={set("descricao")} placeholder="Detalhes do serviço..." style={{ fontSize: 16, padding: "12px 14px" }} />
+              </div>
             </div>
+
             <div style={{ background: "#fffbeb", border: "1px solid #fde68a", padding: 16, borderRadius: 8, marginTop: 16 }}>
               <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 8, color: "#92400e" }}>⏱ Datas de Execução (opcional)</div>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-                <div className="form-group" style={{ margin: 0 }}><label>Início</label><input type="datetime-local" value={cr.dataInicioExec} onChange={set("dataInicioExec")} /></div>
-                <div className="form-group" style={{ margin: 0 }}><label>Término</label><input type="datetime-local" value={cr.dataFimExec} onChange={set("dataFimExec")} /></div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 12 }} className="cadastro-grid">
+                <div className="form-group" style={{ margin: 0 }}>
+                  <label>Início</label>
+                  <input type="datetime-local" value={cr.dataInicioExec} onChange={set("dataInicioExec")} style={{ fontSize: 16, padding: "12px 14px" }} />
+                </div>
+                <div className="form-group" style={{ margin: 0 }}>
+                  <label>Término</label>
+                  <input type="datetime-local" value={cr.dataFimExec} onChange={set("dataFimExec")} style={{ fontSize: 16, padding: "12px 14px" }} />
+                </div>
               </div>
               <p style={{ fontSize: 12, color: "#92400e", marginTop: 8 }}>💡 Se preencher <strong>término</strong>, o serviço já nasce como <strong>concluído</strong>.</p>
             </div>
-            <div style={{ display: "flex", gap: 8, marginTop: 16 }}>
-              <button type="submit" className="btn btn-success">💾 Salvar Serviço</button>
+
+            <div style={{ display: "flex", gap: 8, marginTop: 16, flexWrap: "wrap" }}>
+              <button type="submit" className="btn btn-success" style={{ flex: 1, minWidth: 140 }}>💾 Salvar Serviço</button>
               <button type="button" className="btn btn-outline" onClick={() => setShowCadastroRapido(false)}>Cancelar</button>
             </div>
           </form>

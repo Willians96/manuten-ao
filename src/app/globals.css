@@ -318,3 +318,8 @@ tr:hover td { background: #f8fafc; }
   .stat-card .value { font-size: 20px; }
   .btn { padding: 10px 12px; font-size: 14px; }
 }
+
+/* Cadastro rápido: 1 coluna no mobile, 3 no desktop (apenas na classe .cadastro-grid) */
+@media (min-width: 700px) {
+  .cadastro-grid { grid-template-columns: 1fr 1fr 1fr !important; }
+}
