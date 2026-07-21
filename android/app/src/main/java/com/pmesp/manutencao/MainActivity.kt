@@ -19,12 +19,6 @@ import androidx.swiperefreshlayout.widget.SwipeRefreshLayout
 
 /**
  * Manutenção PMESP — Mobile WebView Otimizado
- *
- * - Viewport mobile fixo (sem zoom horizontal esquisito)
- * - Pinch-to-zoom habilitado (gesto de pinça)
- * - CSS injection pra mobile-friendly
- * - Pull-to-refresh
- * - Progress bar
  */
 class MainActivity : Activity() {
 
@@ -95,28 +89,21 @@ class MainActivity : Activity() {
             loadWithOverviewMode = true
             setSupportZoom(true)
             builtInZoomControls = true
-            displayZoomControls = false  // esconde os botões +/-
-            // Escala inicial: 100% (caber tudo sem zoom)
-            // (setado no WebViewClient abaixo)
-
-            // User agent mobile (não desktop, pra forçar layout responsivo)
-            // Mas como o site já tem @media, deixar o UA padrão
-
-            // Cache e network
+            displayZoomControls = false
             cacheMode = WebSettings.LOAD_DEFAULT
             loadsImagesAutomatically = true
             blockNetworkImage = false
             mixedContentMode = WebSettings.MIXED_CONTENT_NEVER_ALLOW
-
-            // Texto
-            textZoom = 100  // sem zoom de texto extra
-
-            // Outros
+            textZoom = 100
             mediaPlaybackRequiresUserGesture = false
             allowFileAccess = true
             allowContentAccess = true
             setGeolocationEnabled(false)
-            javaScriptCanOpenWindowsAutomatically = false
+
+            // IMPORTANTE: User-Agent SEM o "wv" identifier
+            // O Google bloqueia OAuth em WebView identificando pelo "wv" no UA.
+            // Usamos um UA "real" de Chrome mobile, sem o marker de WebView.
+            userAgentString = "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.6099.230 Mobile Safari/537.36 PMESP-Manutencao"
         }
 
         // Cookies (Clerk auth)
@@ -125,7 +112,7 @@ class MainActivity : Activity() {
             setAcceptThirdPartyCookies(webView, true)
         }
 
-        // === WEB CHROME CLIENT (progresso + janelas) ===
+        // === WEB CHROME CLIENT (progresso) ===
         webView.webChromeClient = object : WebChromeClient() {
             override fun onProgressChanged(view: WebView?, newProgress: Int) {
                 if (newProgress < 100) {
@@ -135,78 +122,31 @@ class MainActivity : Activity() {
                     progressBar.visibility = View.GONE
                 }
             }
-
-            // Captura window.open() (target="_blank") e abre dentro do mesmo WebView
-            override fun onCreateWindow(
-                view: WebView?,
-                isDialog: Boolean,
-                isUserGesture: Boolean,
-                resultMsg: android.os.Message?
-            ): Boolean {
-                if (resultMsg == null) return false
-                val transport = resultMsg.obj as? android.webkit.WebView.WebViewTransport ?: return false
-                val newWebView = WebView(this@MainActivity)
-                newWebView.settings.javaScriptEnabled = true
-                newWebView.webViewClient = webView.webViewClient
-                transport.webView = newWebView
-                resultMsg.sendToTarget()
-                return true
-            }
         }
 
         // === WEB VIEW CLIENT (navegação + ajustes) ===
         webView.webViewClient = object : WebViewClient() {
             override fun shouldOverrideUrlLoading(view: WebView, url: String): Boolean {
+                // Versão simples: HTTP/HTTPS ficam dentro do WebView
+                // Schemes especiais abrem em app externo
                 if (url.startsWith("http://") || url.startsWith("https://")) {
-                    // Domínios do nosso sistema (Vercel, Convex, Clerk) - sempre dentro
-                    val internalDomains = listOf(
-                        // Vercel
-                        "manutencao-drab.vercel.app",
-                        "vercel.app",
-                        // Convex
-                        "decisive-kiwi-683.convex.cloud",
-                        "convex.cloud",
-                        "convex.dev",
-                        // Clerk (muitos subdomínios)
-                        "clerk.accounts.dev",
-                        "clerk.com",
-                        "clerk.dev",
-                        "clerk.telemetry.dev",
-                        "clerk-image-resizer.clerk.com",
-                        // Google (reCAPTCHA, fonts)
-                        "google.com",
-                        "googleapis.com",
-                        "gstatic.com",
-                        "recaptcha.net"
-                    )
-                    val isInternal = internalDomains.any { domain ->
-                        url.contains("://" + domain) || url.contains("." + domain + "/") || url.endsWith("." + domain)
-                    }
-                    if (isInternal) {
-                        view.loadUrl(url)
-                        return false
-                    } else {
-                        // Link externo: abre no navegador do sistema
-                        try {
-                            val intent = android.content.Intent(
-                                android.content.Intent.ACTION_VIEW,
-                                android.net.Uri.parse(url)
-                            )
-                            startActivity(intent)
-                            return true
-                        } catch (e: Exception) {
-                            view.loadUrl(url)
-                            return false
-                        }
-                    }
+                    return false  // deixa o WebView navegar
                 }
-                view.loadUrl(url)
-                return false
+                try {
+                    val intent = android.content.Intent(
+                        android.content.Intent.ACTION_VIEW,
+                        android.net.Uri.parse(url)
+                    )
+                    startActivity(intent)
+                } catch (e: Exception) { }
+                return true
             }
 
             override fun onPageStarted(view: WebView?, url: String?, favicon: Bitmap?) {
                 super.onPageStarted(view, url, favicon)
                 progressBar.visibility = View.VISIBLE
+                // Injeta JS de navegação ANTES do site rodar (sobrescreve window.open)
+                view?.evaluateJavascript(NAVIGATION_OVERRIDE, null)
             }
 
             override fun onPageFinished(view: WebView?, url: String?) {
@@ -214,8 +154,7 @@ class MainActivity : Activity() {
                 progressBar.visibility = View.GONE
                 swipeRefresh.isRefreshing = false
 
-                // Injeta CSS pra forçar layout mobile-friendly
-                // Isso garante que mesmo se a página não tenha media query, vai se adaptar
+                // Injeta CSS pra forçar layout mobile + reaplica navegação override
                 view?.evaluateJavascript(MOBILE_CSS_INJECTION, null)
             }
         }
@@ -256,6 +195,46 @@ class MainActivity : Activity() {
     }
 
     companion object {
+        // JS injetado IMEDIATAMENTE quando a página começa a carregar.
+        // Sobrescreve window.open() pra chamar o JavaScript Interface (Android.navigateTo)
+        // que faz a navegação no WebView principal, evitando popup externa
+        private const val NAVIGATION_OVERRIDE = """
+            (function() {
+              if (window.__pmespNavOverride) return;
+              window.__pmespNavOverride = true;
+
+              // Sobrescreve window.open pra chamar Android.navigateTo (JS Interface)
+              // Isso GARANTE que a navegação aconteça no WebView principal
+              window.open = function(url, target, features) {
+                if (url && window.Android && window.Android.navigateTo) {
+                  window.Android.navigateTo(url);
+                } else if (url) {
+                  window.location.href = url;
+                }
+                return null;
+              };
+
+              // Força todos os links target="_blank" a abrirem na mesma janela
+              document.addEventListener('click', function(e) {
+                var el = e.target;
+                while (el && el.tagName !== 'A') {
+                  el = el.parentElement;
+                }
+                if (el && el.target === '_blank') {
+                  el.target = '_self';
+                }
+              }, true);
+
+              // Sobrescreve form target="_blank"
+              document.addEventListener('submit', function(e) {
+                var form = e.target;
+                if (form && form.target === '_blank') {
+                  form.target = '_self';
+                }
+              }, true);
+            })();
+        """
+
         // CSS + JS injetado em TODA página pra garantir layout mobile
         // + dropdown de navegação nativo do app
         // Usa MutationObserver pra reaplicar se Next.js re-renderizar
@@ -281,6 +260,14 @@ class MainActivity : Activity() {
                     + '.sidebar .logo-area .org-name { display: none !important; }'
                     + '.sidebar .sidebar-footer { display: none !important; }';
                   (document.head || document.documentElement).appendChild(css);
+                }
+
+                // === 1.5. Forçar que target=_blank abra na MESMA janela ===
+                if (!document.getElementById('pmesp-link-override')) {
+                  var cssLinks = document.createElement('style');
+                  cssLinks.id = 'pmesp-link-override';
+                  cssLinks.innerHTML = 'a[target="_blank"] { target: _self !important; }';
+                  (document.head || document.documentElement).appendChild(cssLinks);
                 }
 
                 // === 2. DROPDOWN DE NAVEGAÇÃO ===
