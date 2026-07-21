@@ -727,9 +727,9 @@ export const encerrarServico = mutation({
       createdAt: Date.now(),
     });
 
-    // PUSH: notifica o gestor e o solicitante
+    // PUSH: notifica o gestor e o solicitante (só se NÃO for cadastroDireto)
     const servico = await ctx.db.get(args.servicoId);
-    if (servico) {
+    if (servico && !servico.cadastroDireto) {
       const tokens: string[] = [];
       // Gestores
       const gestores = await ctx.db
@@ -743,7 +743,7 @@ export const encerrarServico = mutation({
       for (const u of [...gestores, ...admins]) {
         if (u.fcmToken) tokens.push(u.fcmToken);
       }
-      // Solicitante
+      // Solicitante (só se não for cadastroDireto - aí tem user real)
       if (servico.solicitanteId) {
         const sol = await ctx.db.get(servico.solicitanteId);
         if (sol?.fcmToken) tokens.push(sol.fcmToken);

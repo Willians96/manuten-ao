@@ -24,4 +24,9 @@ android/.cxx/
 *.iml
 .idea/
 
+# Firebase - contains API key (sensível)
+android/app/google-services.json
+google-services.json
+google-services.json firebase/
+
 .vercel
