@@ -87,18 +87,16 @@ export default function AprovarPage() {
       alert("Usuário excluído.");
     } catch (e: any) {
       // Se der erro de dependência, oferece exclusão em cascata
-      if (e.message && (e.message.includes("serviço") || e.message.includes("técnico"))) {
-        const tipo = e.message.includes("técnico") ? "técnico cadastrado" : "serviço(s) vinculado(s)";
-        if (confirm(`⚠️ O usuário tem ${tipo}.\n\nQuer EXCLUIR EM CASCATA? (apaga o user + serviços + técnicos vinculados juntos)\n\nISTO É IRREVERSÍVEL!`)) {
-          try {
-            await forceDeleteUserMutation({ userId: user._id as any });
-            alert("Usuário e dependências excluídos em cascata.");
-          } catch (e2: any) {
-            alert("Erro no cascade: " + e2.message);
-          }
+      const errMsg = e?.message || e?.data?.message || String(e);
+      console.log("Erro deleteUser:", errMsg);
+      if (confirm(`❌ Erro: ${errMsg}\n\nTentar EXCLUIR EM CASCATA? (apaga o user + serviços + técnicos vinculados juntos)\n\nISTO É IRREVERSÍVEL!`)) {
+        try {
+          await forceDeleteUserMutation({ userId: user._id as any });
+          alert("Usuário e dependências excluídos em cascata.");
+        } catch (e2: any) {
+          const errMsg2 = e2?.message || e2?.data?.message || String(e2);
+          alert("Erro no cascade: " + errMsg2);
         }
-      } else {
-        alert("Erro: " + e.message);
       }
     }
   }

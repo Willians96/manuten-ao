@@ -449,13 +449,12 @@ export const forceDeleteUser = mutation({
       throw new Error("Não é possível excluir o Admin Master");
     }
 
-    // 1. Apaga logs de serviços onde o user era técnico
+    // 1. Apaga técnicos do user (e seus serviceLogs)
     const tecnicos = await ctx.db
       .query("tecnicos")
       .withIndex("by_user", (q) => q.eq("userId", args.userId))
       .collect();
     for (const t of tecnicos) {
-      // serviceLogs tem by_tecnico
       const logs = await ctx.db
         .query("serviceLogs")
         .withIndex("by_tecnico", (q) => q.eq("tecnicoId", t._id))
@@ -463,11 +462,10 @@ export const forceDeleteUser = mutation({
       for (const log of logs) {
         await ctx.db.delete(log._id);
       }
-      // Apaga o técnico
       await ctx.db.delete(t._id);
     }
 
-    // 2. Apaga serviços onde o user foi solicitante (junto com logs)
+    // 2. Apaga serviços onde o user foi solicitante
     const servicos = await ctx.db
       .query("servicos")
       .withIndex("by_solicitante", (q) => q.eq("solicitanteId", args.userId))
@@ -485,6 +483,7 @@ export const forceDeleteUser = mutation({
 
     // 3. Apaga o user
     await ctx.db.delete(args.userId);
+    return { ok: true, message: "Usuário e dependências excluídos" };
   },
 });
 
