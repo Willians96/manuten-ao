@@ -1,4 +1,5 @@
 import { httpAction } from "./_generated/server";
+import { api } from "./_generated/api";
 
 /**
  * HTTP Action pública para o app Android salvar o FCM token.
@@ -7,7 +8,7 @@ import { httpAction } from "./_generated/server";
  *   1. Android pega o token via FirebaseMessaging.getInstance().token
  *   2. WebView carrega, JS pega Clerk.user.id + window.__fcmToken
  *   3. JS faz POST pra cá com {clerkId, token, appSecret}
- *   4. A action valida secret, acha user por clerkId, salva fcmToken
+ *   4. A action valida secret, chama runQuery(runMutation) e salva fcmToken
  *
  * Por que não usar a mutation saveFcmToken (autenticada)?
  *   - A mutation autenticada exige JWT do Clerk, que só existe no browser
@@ -26,7 +27,7 @@ export const saveFcmToken = httpAction(async (ctx, request) => {
       headers: {
         "Access-Control-Allow-Origin": "*",
         "Access-Control-Allow-Methods": "POST, OPTIONS",
-        "Access-Control-Allow-Headers": "Content-Type, X-App-Secret",
+        "Access-Control-Allow-Headers": "Content-Type",
       },
     });
   }
@@ -64,12 +65,8 @@ export const saveFcmToken = httpAction(async (ctx, request) => {
     });
   }
 
-  // Procura o user direto via ctx.db (httpAction tem acesso ao db)
-  const user = await ctx.db
-    .query("users")
-    .withIndex("by_clerkId", (q) => q.eq("clerkId", clerkId))
-    .first();
-
+  // Procura o user via query pública
+  const user = await ctx.runQuery(api.mutations.findUserByClerkIdPublic, { clerkId });
   if (!user) {
     return new Response(JSON.stringify({ error: "user not found" }), {
       status: 404,
@@ -77,8 +74,11 @@ export const saveFcmToken = httpAction(async (ctx, request) => {
     });
   }
 
-  // Salva token
-  await ctx.db.patch(user._id, { fcmToken: token });
+  // Salva token via mutation pública
+  await ctx.runMutation(api.mutations.setFcmTokenByUserIdPublic, {
+    userId: user._id,
+    token,
+  });
 
   return new Response(
     JSON.stringify({ ok: true, userId: user._id }),

@@ -164,6 +164,26 @@ export const saveFcmToken = mutation({
   },
 });
 
+// Funções usadas pela httpAction (não exigem auth Clerk)
+// Validação de segurança fica na httpAction (via appSecret)
+export const findUserByClerkIdPublic = query({
+  args: { clerkId: v.string() },
+  handler: async (ctx, args) => {
+    return await ctx.db
+      .query("users")
+      .withIndex("by_clerkId", (q) => q.eq("clerkId", args.clerkId))
+      .first();
+  },
+});
+
+export const setFcmTokenByUserIdPublic = mutation({
+  args: { userId: v.id("users"), token: v.string() },
+  handler: async (ctx, args) => {
+    await ctx.db.patch(args.userId, { fcmToken: args.token });
+    return { ok: true };
+  },
+});
+
 
 // ── Queries ──────────────────────────────────────────────────────────────
 
