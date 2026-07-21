@@ -25,6 +25,7 @@ export default function AprovarPage() {
   const approve = useMutation(api.mutations.approveUser);
   const updateRole = useMutation(api.mutations.updateUserRole);
   const deleteUserMutation = useMutation(api.mutations.deleteUser);
+  const forceDeleteUserMutation = useMutation(api.mutations.forceDeleteUser);
 
   const isAdminMaster = me?.isAdminMaster === true;
 
