@@ -27,6 +27,9 @@ class MainActivity : Activity() {
     private lateinit var swipeRefresh: SwipeRefreshLayout
     private val APP_URL = "https://manutencao-drab.vercel.app"
 
+    // Guarda o FCM token caso o callback do Firebase dispare ANTES do WebView existir
+    private var pendingFcmToken: String? = null
+
     private val NOTIFICATION_PERMISSION_REQUEST = 1001
 
     @SuppressLint("SetJavaScriptEnabled")
@@ -55,11 +58,11 @@ class MainActivity : Activity() {
                     if (task.isSuccessful) {
                         val token = task.result
                         android.util.Log.d("MainActivity", "FCM token obtido: ${token.take(20)}...")
-                        // Garante que o WebView já existe antes de injetar
-                        if (webView != null) {
-                            webView.evaluateJavascript(
-                                "window.__fcmToken = " + jsString(token) + "; console.log('FCM: token injetado no window');", null
-                            )
+                        // SEMPRE guarda o token - se WebView ainda não existir, vai injetar depois
+                        pendingFcmToken = token
+                        // Se WebView já existe, injeta agora
+                        if (::webView.isInitialized) {
+                            injectFcmToken()
                         }
                     } else {
                         android.util.Log.e("MainActivity", "Falha ao pegar FCM token", task.exception)
@@ -186,10 +189,12 @@ class MainActivity : Activity() {
                 progressBar.visibility = View.GONE
                 swipeRefresh.isRefreshing = false
 
-                // Injeta CSS + JS de logout (botão flutuante + item no dropdown)
+                // 1. SEMPRE injeta o FCM token primeiro (se já chegou do Firebase)
+                injectFcmToken()
+                // 2. Injeta CSS + JS de logout
                 view?.evaluateJavascript(MOBILE_CSS_INJECTION, null)
                 view?.evaluateJavascript(LOGOUT_INJECTION, null)
-                // Salva o FCM token no Convex via httpAction (não precisa de JWT Clerk)
+                // 3. Salva o FCM token no Convex via httpAction (não precisa de JWT Clerk)
                 view?.evaluateJavascript(FCM_TOKEN_SAVE, null)
             }
         }
@@ -239,6 +244,20 @@ class MainActivity : Activity() {
             .replace("\"", "\\\"")
             .replace("\n", "\\n")
             .replace("\r", "\\r") + "\""
+    }
+
+    /**
+     * Injeta o FCM token no window.__fcmToken.
+     * Se já tiver token pendente (Firebase entregou antes do WebView), injeta agora.
+     */
+    private fun injectFcmToken() {
+        val token = pendingFcmToken ?: return
+        if (!::webView.isInitialized) return
+        webView.evaluateJavascript(
+            "window.__fcmToken = " + jsString(token) + "; console.log('[FCM] token injetado no window');",
+            null
+        )
+        android.util.Log.d("MainActivity", "FCM token injetado no WebView")
     }
 
     companion object {
