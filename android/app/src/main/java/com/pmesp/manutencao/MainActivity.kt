@@ -275,12 +275,31 @@ class MainActivity : Activity() {
               window.__pmespFcmSaving = true;
               console.log('[FCM] Script FCM_TOKEN_SAVE injetado');
 
+              // Envia log pra o Convex dashboard
+              function debugLog(step, extra) {
+                try {
+                  var body = JSON.stringify(Object.assign({
+                    step: step,
+                    hasToken: !!window.__fcmToken,
+                    hasClerkUser: !!(window.Clerk && window.Clerk.user),
+                    clerkId: (window.Clerk && window.Clerk.user) ? window.Clerk.user.id : null
+                  }, extra || {}));
+                  fetch('https://decisive-kiwi-683.convex.site/fcmDebugLog', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: body
+                  }).catch(function(e) { console.log('[FCM] debugLog erro: ' + e); });
+                } catch(e) { console.log('[FCM] debugLog throw: ' + e); }
+              }
+
+              debugLog('script_injected');
+              console.log('[FCM] Enviado log: script_injected');
+
               function trySave(reason) {
                 console.log('[FCM] trySave(' + reason + ') - token=' + (window.__fcmToken ? 'PRESENTE' : 'AUSENTE'));
                 if (!window.__fcmToken) {
                   return false;
                 }
-                // Pega o Clerk user id (aguarda carregar)
                 var clerkUser = null;
                 if (window.Clerk && window.Clerk.user) {
                   clerkUser = window.Clerk.user;
@@ -290,7 +309,6 @@ class MainActivity : Activity() {
                   return false;
                 }
 
-                // Evita duplicar
                 if (window.__pmespFcmSaved) {
                   console.log('[FCM] ja salvo antes, pulando');
                   return true;
@@ -301,6 +319,7 @@ class MainActivity : Activity() {
                 var clerkId = clerkUser.id;
                 var appSecret = "PMESP-FCM-2026-manutencao-drab";
 
+                debugLog('sending_save', { info: 'token_prefix=' + token.substring(0, 10) });
                 console.log('[FCM] Enviando POST /saveFcmToken...');
                 fetch('https://decisive-kiwi-683.convex.site/saveFcmToken', {
                   method: 'POST',
@@ -309,26 +328,29 @@ class MainActivity : Activity() {
                 })
                 .then(function(res) {
                   console.log('[FCM] HTTP status=' + res.status);
+                  debugLog('response_status', { info: 'status=' + res.status });
                   return res.text();
                 })
                 .then(function(text) {
                   console.log('[FCM] Resposta: ' + text);
+                  debugLog('response_body', { info: text });
                 })
                 .catch(function(err) {
                   console.error('[FCM] Erro: ' + err);
-                  window.__pmespFcmSaved = false; // permite tentar de novo
+                  debugLog('fetch_error', { error: String(err) });
+                  window.__pmespFcmSaved = false;
                 });
                 return true;
               }
 
-              // Tenta várias vezes (Clerk pode demorar pra carregar)
               var attempts = 0;
               var interval = setInterval(function() {
                 attempts++;
                 var ok = trySave('tick#' + attempts);
-                if (ok || attempts > 30) { // 30 tentativas × 1s = 30s
+                if (ok || attempts > 30) {
                   clearInterval(interval);
                   console.log('[FCM] Parou de tentar (attempts=' + attempts + ', ok=' + ok + ')');
+                  debugLog('finished', { info: 'attempts=' + attempts + ', ok=' + ok });
                 }
               }, 1000);
             })();

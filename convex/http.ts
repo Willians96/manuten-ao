@@ -118,4 +118,29 @@ http.route({
   handler: saveFcmToken,
 });
 
+// HTTP action pra debug do FCM - loga cada passo do app Android
+// Os logs aparecem no Convex Dashboard > Logs (filtrar por FCM-DEBUG)
+const fcmDebugLog = httpAction(async (ctx, request) => {
+  if (request.method !== "POST") {
+    return new Response("Method not allowed", { status: 405 });
+  }
+  let body: any = {};
+  try {
+    body = await request.json();
+  } catch {}
+  const { step, info, hasToken, hasClerkUser, clerkId, error } = body || {};
+  const msg = `[FCM-DEBUG] step=${step} hasToken=${!!hasToken} hasClerkUser=${!!hasClerkUser} clerkId=${clerkId || "?"} info=${info || ""} error=${error || ""}`;
+  console.log(msg);
+  return new Response(JSON.stringify({ ok: true }), {
+    status: 200,
+    headers: { "Content-Type": "application/json" },
+  });
+});
+
+http.route({
+  path: "/fcmDebugLog",
+  method: "POST",
+  handler: fcmDebugLog,
+});
+
 export default http;
