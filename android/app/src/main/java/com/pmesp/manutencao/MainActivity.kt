@@ -64,13 +64,21 @@ class MainActivity : Activity() {
                         if (::webView.isInitialized) {
                             injectFcmToken()
                         }
+                        // TAMBÉM faz heartbeat direto do Kotlin pra confirmar que app tem internet
+                        // (independente do WebView / JavaScript)
+                        heartbeatKotlin("fcm_token_obtained", token.take(20))
                     } else {
                         android.util.Log.e("MainActivity", "Falha ao pegar FCM token", task.exception)
+                        heartbeatKotlin("fcm_token_failed", task.exception?.message ?: "unknown")
                     }
                 }
         } catch (e: Exception) {
             android.util.Log.e("MainActivity", "Erro FCM", e)
+            heartbeatKotlin("fcm_throw", e.message ?: "exception")
         }
+
+        // Heartbeat IMEDIATO (sem esperar Firebase) - confirma que o app está vivo
+        heartbeatKotlin("app_start", "MainActivity onCreate")
 
         // Layout: LinearLayout vertical (progress + swipe > webview)
         val rootLayout = LinearLayout(this).apply {
@@ -258,6 +266,31 @@ class MainActivity : Activity() {
             null
         )
         android.util.Log.d("MainActivity", "FCM token injetado no WebView")
+    }
+
+    /**
+     * Faz heartbeat HTTP DIRETO do Kotlin (não depende de JS/WebView)
+     * Serve pra confirmar que o app está vivo e tem internet, mesmo se o
+     * JavaScript injetado não executar.
+     */
+    private fun heartbeatKotlin(step: String, info: String) {
+        Thread {
+            try {
+                val url = java.net.URL("https://decisive-kiwi-683.convex.site/fcmDebugLog")
+                val con = url.openConnection() as java.net.HttpURLConnection
+                con.requestMethod = "POST"
+                con.setRequestProperty("Content-Type", "application/json")
+                con.connectTimeout = 5000
+                con.readTimeout = 5000
+                con.doOutput = true
+                val body = "{\"step\":\"kotlin_$step\",\"info\":\"$info\",\"source\":\"fcm-android-kotlin\"}"
+                con.outputStream.use { it.write(body.toByteArray()) }
+                val code = con.responseCode
+                android.util.Log.d("MainActivity", "Heartbeat $step: HTTP $code")
+            } catch (e: Exception) {
+                android.util.Log.e("MainActivity", "Heartbeat $step falhou: ${e.message}")
+            }
+        }.start()
     }
 
     companion object {
