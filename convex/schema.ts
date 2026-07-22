@@ -121,4 +121,18 @@ export default defineSchema({
   })
     .index("by_servico", ["servicoId"])
     .index("by_tecnico", ["tecnicoId"]),
+
+  // Logs de debug do app Android (FCM, login, etc) - visualizável em /debug-fcm
+  debugLogs: defineTable({
+    source: v.string(), // "fcm-android", "fcm-web", "login", etc
+    step: v.string(),
+    info: v.optional(v.string()),
+    clerkId: v.optional(v.string()),
+    hasToken: v.optional(v.boolean()),
+    hasClerkUser: v.optional(v.boolean()),
+    error: v.optional(v.string()),
+    createdAt: v.number(),
+  })
+    .index("by_createdAt", ["createdAt"])
+    .index("by_source", ["source"]),
 });

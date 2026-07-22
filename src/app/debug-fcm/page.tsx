@@ -16,6 +16,7 @@ export default function DebugFcmPage() {
 
 function DebugFcmContent() {
   const users = useQuery(api.mutations.debugListUsers, {});
+  const logs = useQuery(api.mutations.debugListLogs, { source: "fcm-android" });
   const clearFcmToken = useMutation(api.mutations.clearFcmTokenAdmin);
   const [autoRefresh, setAutoRefresh] = useState(true);
   const [lastUpdate, setLastUpdate] = useState<Date>(new Date());
@@ -30,9 +31,9 @@ function DebugFcmContent() {
   const withoutToken = (users ?? []).filter((u: any) => !u.fcmToken || u.fcmToken.length <= 10);
 
   return (
-    <div className="page-container" style={{ maxWidth: 1100 }}>
+    <div className="page-container" style={{ maxWidth: 1200 }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16, flexWrap: "wrap", gap: 12 }}>
-        <h1 className="page-title" style={{ margin: 0 }}>🔔 Debug FCM — Tokens</h1>
+        <h1 className="page-title" style={{ margin: 0 }}>🔔 Debug FCM — Tokens & Logs</h1>
         <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
           <label style={{ fontSize: 13, color: "#6b7280" }}>
             <input type="checkbox" checked={autoRefresh} onChange={(e) => setAutoRefresh(e.target.checked)} />{" "}
@@ -58,6 +59,35 @@ function DebugFcmContent() {
         <div style={{ fontSize: 13, color: "#b91c1c" }}>
           Push NÃO vai chegar pra esses. Geralmente é técnico que não abriu o app ou admin que só usa o navegador.
         </div>
+      </div>
+
+      {/* LOGS DO APP - seção chave pra debugar */}
+      <h2 style={{ fontSize: 16, marginTop: 24, marginBottom: 12 }}>📡 Logs do App Android (últimos 50)</h2>
+      <div className="card" style={{ background: "#0f172a", color: "#e2e8f0", fontFamily: "monospace", fontSize: 11 }}>
+        {logs && logs.length > 0 ? (
+          <div style={{ maxHeight: 320, overflowY: "auto" }}>
+            {logs.map((log: any) => (
+              <div key={log._id} style={{ padding: "4px 0", borderBottom: "1px solid #1e293b" }}>
+                <span style={{ color: "#64748b" }}>{new Date(log.createdAt).toLocaleTimeString("pt-BR")}</span>
+                {" "}
+                <span style={{ color: log.error ? "#ef4444" : "#10b981", fontWeight: 700 }}>
+                  [{log.step}]
+                </span>
+                {" "}
+                <span style={{ color: "#94a3b8" }}>
+                  token={String(log.hasToken)} clerk={String(log.hasClerkUser)}
+                </span>
+                {log.clerkId && <span style={{ color: "#fbbf24" }}> user={log.clerkId.substring(0, 12)}...</span>}
+                {log.info && <span style={{ color: "#60a5fa" }}> info={log.info}</span>}
+                {log.error && <span style={{ color: "#ef4444" }}> ❌ {log.error}</span>}
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div style={{ padding: 20, textAlign: "center", color: "#94a3b8" }}>
+            Nenhum log ainda. Abra o app no celular do João pra começar a ver.
+          </div>
+        )}
       </div>
 
       <h2 style={{ fontSize: 16, marginTop: 24, marginBottom: 12 }}>👥 Todos os usuários</h2>
@@ -112,14 +142,17 @@ function DebugFcmContent() {
       </div>
 
       <div className="card" style={{ marginTop: 24, background: "#fef9c3", borderLeft: "4px solid #eab308" }}>
-        <div style={{ fontWeight: 700, color: "#854d0e", marginBottom: 8 }}>🧪 Como diagnosticar se push não chega</div>
+        <div style={{ fontWeight: 700, color: "#854d0e", marginBottom: 8 }}>🧪 Como diagnosticar</div>
         <ol style={{ paddingLeft: 20, fontSize: 13, color: "#713f12", lineHeight: 1.6 }}>
-          <li>Confirme que o usuário abriu o app <strong>recentemente</strong> (página carregou normal)</li>
-          <li>Veja se a linha dele aparece ✅ com token aqui nesta página (auto-refresh a cada 2s)</li>
-          <li>Se aparecer ✅ com token mas push não chega: problema é no FCM V1 (env var FCM_SERVICE_ACCOUNT_JSON)</li>
-          <li>Se aparecer vazio: problema é no app Android (WebView não está rodando o JS FCM_TOKEN_SAVE)</li>
+          <li>Abra o app no celular do João</li>
+          <li>Volte nessa página e olhe os <strong>Logs do App Android</strong> (caixa preta acima)</li>
+          <li>Se aparecer <code>[script_injected]</code> → JS rodou, problema é no Clerk ou no fetch</li>
+          <li>Se aparecer <code>[sending_save]</code> → fetch foi disparado</li>
+          <li>Se aparecer <code>[response_status 200]</code> → salvou com sucesso!</li>
+          <li>Se <strong>nada</strong> aparecer → JS não está executando (WebView com problema)</li>
         </ol>
       </div>
     </div>
   );
 }
+

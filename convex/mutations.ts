@@ -570,6 +570,19 @@ export const debugListUsers = query({
   },
 });
 
+// Debug: lista os logs do app (FCM, login, etc) - últimos 50
+export const debugListLogs = query({
+  args: { source: v.optional(v.string()) },
+  handler: async (ctx, args) => {
+    let q = ctx.db.query("debugLogs").order("desc");
+    if (args.source) {
+      q = ctx.db.query("debugLogs").withIndex("by_source", (qq) => qq.eq("source", args.source as string));
+    }
+    const logs = await q.take(50);
+    return logs;
+  },
+});
+
 // Limpa o FCM token de um user (só admin master) - usado na página de debug
 export const clearFcmTokenAdmin = mutation({
   args: { userId: v.id("users") },

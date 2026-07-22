@@ -119,7 +119,7 @@ http.route({
 });
 
 // HTTP action pra debug do FCM - loga cada passo do app Android
-// Os logs aparecem no Convex Dashboard > Logs (filtrar por FCM-DEBUG)
+// Grava na tabela debugLogs que pode ser vista em /debug-fcm
 const fcmDebugLog = httpAction(async (ctx, request) => {
   if (request.method !== "POST") {
     return new Response("Method not allowed", { status: 405 });
@@ -128,9 +128,26 @@ const fcmDebugLog = httpAction(async (ctx, request) => {
   try {
     body = await request.json();
   } catch {}
-  const { step, info, hasToken, hasClerkUser, clerkId, error } = body || {};
+  const { step, info, hasToken, hasClerkUser, clerkId, error, source } = body || {};
   const msg = `[FCM-DEBUG] step=${step} hasToken=${!!hasToken} hasClerkUser=${!!hasClerkUser} clerkId=${clerkId || "?"} info=${info || ""} error=${error || ""}`;
   console.log(msg);
+
+  // Grava na tabela debugLogs pra ver em /debug-fcm
+  try {
+    await ctx.db.insert("debugLogs", {
+      source: source || "fcm-android",
+      step: step || "unknown",
+      info,
+      clerkId,
+      hasToken,
+      hasClerkUser,
+      error,
+      createdAt: Date.now(),
+    });
+  } catch (e) {
+    console.error("[FCM-DEBUG] Erro ao gravar no debugLogs:", e);
+  }
+
   return new Response(JSON.stringify({ ok: true }), {
     status: 200,
     headers: { "Content-Type": "application/json" },
