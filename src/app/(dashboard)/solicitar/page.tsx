@@ -8,7 +8,7 @@ export const dynamic = "force-dynamic";
 
 export default function SolicitarPage() {
   return (
-    <RoleGuard allow={["solicitante", "gestor", "admin", "tecnico"]}>
+    <RoleGuard allow={["solicitante", "gestor", "admin"]}>
       <SolicitarPageContent />
     </RoleGuard>
   );

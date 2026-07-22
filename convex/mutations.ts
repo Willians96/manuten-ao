@@ -570,6 +570,24 @@ export const debugListUsers = query({
   },
 });
 
+// Limpa o FCM token de um user (só admin master) - usado na página de debug
+export const clearFcmTokenAdmin = mutation({
+  args: { userId: v.id("users") },
+  handler: async (ctx, args) => {
+    const currentUserId = await getCurrentUserId(ctx);
+    if (!currentUserId) throw new Error("Não autenticado");
+    const currentUser = await ctx.db
+      .query("users")
+      .withIndex("by_clerkId", (q) => q.eq("clerkId", currentUserId))
+      .first();
+    if (!currentUser || currentUser.role !== "admin" || !currentUser.isAdminMaster) {
+      throw new Error("Apenas Admin Master pode limpar tokens de outros");
+    }
+    await ctx.db.patch(args.userId, { fcmToken: "" });
+    return { ok: true };
+  },
+});
+
 // Excluir usuário EM CASCATA - SÓ Admin Master
 // Apaga TUDO do user: serviços onde foi solicitante, técnicos vinculados, e o user
 // (serviços onde o user é TÉCNICO não são apagados - só ficam sem responsável)
