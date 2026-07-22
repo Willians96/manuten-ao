@@ -583,6 +583,32 @@ export const debugListLogs = query({
   },
 });
 
+// Public mutation usada pela httpAction fcmDebugLog (não exige auth)
+export const addDebugLogPublic = mutation({
+  args: {
+    source: v.string(),
+    step: v.string(),
+    info: v.optional(v.string()),
+    clerkId: v.optional(v.string()),
+    hasToken: v.optional(v.boolean()),
+    hasClerkUser: v.optional(v.boolean()),
+    error: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    await ctx.db.insert("debugLogs", {
+      source: args.source,
+      step: args.step,
+      info: args.info,
+      clerkId: args.clerkId,
+      hasToken: args.hasToken,
+      hasClerkUser: args.hasClerkUser,
+      error: args.error,
+      createdAt: Date.now(),
+    });
+    return { ok: true };
+  },
+});
+
 // Limpa o FCM token de um user (só admin master) - usado na página de debug
 export const clearFcmTokenAdmin = mutation({
   args: { userId: v.id("users") },

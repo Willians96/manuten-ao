@@ -132,9 +132,9 @@ const fcmDebugLog = httpAction(async (ctx, request) => {
   const msg = `[FCM-DEBUG] step=${step} hasToken=${!!hasToken} hasClerkUser=${!!hasClerkUser} clerkId=${clerkId || "?"} info=${info || ""} error=${error || ""}`;
   console.log(msg);
 
-  // Grava na tabela debugLogs pra ver em /debug-fcm
+  // Grava na tabela debugLogs via mutation pública
   try {
-    await ctx.db.insert("debugLogs", {
+    await ctx.runMutation(api.mutations.addDebugLogPublic, {
       source: source || "fcm-android",
       step: step || "unknown",
       info,
@@ -142,7 +142,6 @@ const fcmDebugLog = httpAction(async (ctx, request) => {
       hasToken,
       hasClerkUser,
       error,
-      createdAt: Date.now(),
     });
   } catch (e) {
     console.error("[FCM-DEBUG] Erro ao gravar no debugLogs:", e);
