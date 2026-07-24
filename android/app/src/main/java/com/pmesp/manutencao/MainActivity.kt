@@ -454,18 +454,19 @@ class MainActivity : Activity() {
                     this.value = '';
                     // Tenta usar o Clerk JS API
                     if (window.Clerk && window.Clerk.signOut) {
-                      window.Clerk.signOut().then(function() {
-                        window.location.reload();
+                      window.Clerk.signOut({ redirectUrlPrefix: '/sign-in' }).then(function() {
+                        // Após signOut, vai pra tela de login (não reload, evita 404)
+                        window.location.replace('/sign-in');
                       }).catch(function(e) {
-                        // Fallback: força reload + clear cookies
+                        // Fallback: clear cookies + vai pro login
                         document.cookie.split(";").forEach(function(c) {
                           document.cookie = c.replace(/^ +/, "").replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/");
                         });
-                        window.location.href = '/';
+                        window.location.replace('/sign-in');
                       });
                     } else {
-                      // Fallback: vai pra raiz que mostra tela de login
-                      window.location.href = '/';
+                      // Fallback: vai direto pra tela de login
+                      window.location.replace('/sign-in');
                     }
                   }
                 });
