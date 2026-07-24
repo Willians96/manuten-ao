@@ -45,8 +45,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     { href: "/gestor/relatorios", label: "Relatórios", icon: "📈", roles: ["gestor", "admin"] },
     { href: "/gestor/aprovar", label: "Aprovar Usuários", icon: "👥", roles: ["gestor", "admin"] },
     { href: "/gestor/equipes", label: "Equipes", icon: "🔧", roles: ["gestor", "admin"] },
-    { href: "/tecnico", label: "Meus Serviços", icon: "📋", roles: ["tecnico"] },
-    { href: "/solicitar", label: "Solicitar / Minhas", icon: "📝", roles: ["solicitante"] },
+    // Admin Master também pode acessar painel técnico e solicitar (filtro dinâmico pelo role)
+    { href: "/tecnico", label: "Painel Técnico", icon: "🔧", roles: ["tecnico", "admin"] },
+    { href: "/solicitar", label: "Solicitar / Minhas", icon: "📝", roles: ["solicitante", "gestor", "admin"] },
   ];
 
   const visibleLinks = links.filter((l) => l.roles.includes(role));
