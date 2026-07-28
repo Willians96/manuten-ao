@@ -159,4 +159,78 @@ http.route({
   handler: fcmDebugLog,
 });
 
+// HTTP action admin pra rodar migrations (valida via FCM_APP_SECRET)
+// Usada pra corrigir dados do banco sem precisar de auth Clerk
+const runMigration = httpAction(async (ctx, request) => {
+  if (request.method !== "POST") {
+    return new Response("Method not allowed", { status: 405 });
+  }
+
+  const APP_SECRET = process.env.FCM_APP_SECRET || "PMESP-FCM-2026-manutencao-drab";
+  let body: any = {};
+  try { body = await request.json(); } catch {}
+  const { name, args: migArgs, appSecret } = body || {};
+
+  if (appSecret !== APP_SECRET) {
+    return new Response(JSON.stringify({ error: "unauthorized" }), {
+      status: 401,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+
+  if (name === "fixTecnicoUserLink") {
+    const { re } = migArgs || {};
+    if (!re) {
+      return new Response(JSON.stringify({ error: "re is required" }), {
+        status: 400,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+    // Acha o tecnico via query pública
+    const tecnico = await ctx.runQuery(api.mutations.findTecnicoByRePublic, { re });
+    if (!tecnico) {
+      return new Response(JSON.stringify({ error: `Técnico com RE ${re} não encontrado` }), {
+        status: 404,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+    // Acha o user real
+    const realUser = await ctx.runQuery(api.mutations.findRealUserByRePublic, { re });
+    if (!realUser) {
+      return new Response(JSON.stringify({ error: `User real com RE ${re} não encontrado` }), {
+        status: 404,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+    // Atualiza o tecnico
+    await ctx.runMutation(api.mutations.patchTecnicoUserIdPublic, {
+      tecnicoId: tecnico._id,
+      userId: realUser._id,
+    });
+    // Deleta placeholders
+    const deleted = await ctx.runMutation(api.mutations.deletePlaceholderUsersByRePublic, { re });
+    return new Response(JSON.stringify({
+      ok: true,
+      tecnicoId: tecnico._id,
+      realUserId: realUser._id,
+      realUserName: realUser.name,
+      deletedPlaceholders: deleted,
+    }), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+
+  return new Response(JSON.stringify({ error: `migration '${name}' not found` }), {
+    status: 404,
+    headers: { "Content-Type": "application/json" },
+  });
+});
+
+http.route({
+  path: "/runMigration",
+  method: "POST",
+  handler: runMigration,
+});
+
 export default http;

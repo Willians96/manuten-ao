@@ -609,6 +609,54 @@ export const addDebugLogPublic = mutation({
   },
 });
 
+// Queries/mutations públicas usadas pela httpAction /runMigration (correção de vínculo)
+export const findTecnicoByRePublic = query({
+  args: { re: v.string() },
+  handler: async (ctx, args) => {
+    return await ctx.db
+      .query("tecnicos")
+      .filter((q) => q.eq(q.field("re"), args.re))
+      .first();
+  },
+});
+
+export const findRealUserByRePublic = query({
+  args: { re: v.string() },
+  handler: async (ctx, args) => {
+    const users = await ctx.db
+      .query("users")
+      .filter((q) => q.eq(q.field("re"), args.re))
+      .collect();
+    return users.find((u) => !u.clerkId.startsWith("pendente:")) ?? null;
+  },
+});
+
+export const patchTecnicoUserIdPublic = mutation({
+  args: { tecnicoId: v.id("tecnicos"), userId: v.id("users") },
+  handler: async (ctx, args) => {
+    await ctx.db.patch(args.tecnicoId, { userId: args.userId });
+    return { ok: true };
+  },
+});
+
+export const deletePlaceholderUsersByRePublic = mutation({
+  args: { re: v.string() },
+  handler: async (ctx, args) => {
+    const users = await ctx.db
+      .query("users")
+      .filter((q) => q.eq(q.field("re"), args.re))
+      .collect();
+    let deleted = 0;
+    for (const u of users) {
+      if (u.clerkId.startsWith("pendente:")) {
+        await ctx.db.delete(u._id);
+        deleted++;
+      }
+    }
+    return deleted;
+  },
+});
+
 // Limpa o FCM token de um user (só admin master) - usado na página de debug
 export const clearFcmTokenAdmin = mutation({
   args: { userId: v.id("users") },
@@ -1201,24 +1249,48 @@ export const cadastrarTecnico = mutation({
       );
     }
 
-    // Cria um user PLACEHOLDER pro tecnico (clerkId fake)
-    // Quando o tecnico real logar, o upsertUser vincula pelo RE
-    const placeholderClerkId = `pendente:${args.re}`;
-    const newUserId = await ctx.db.insert("users", {
-      clerkId: placeholderClerkId,
-      email: `${args.re}@pendente.pmesp`,
-      name: args.nomeDeGuerra,
-      role: "tecnico",
-      graduacao: args.graduacao,
-      nomeDeGuerra: args.nomeDeGuerra,
-      re: args.re,
-      secao: "Manutenção",
-      approved: true,
-      createdAt: Date.now(),
-    });
+    // Verifica se já existe um USER (não-placeholder) com esse RE
+    // (Pode acontecer do técnico ter logado no Clerk ANTES do gestor cadastrá-lo)
+    let userId: Id<"users">;
+    // Sem índice by_re (pra evitar migration de schema), usa filter + first
+    const candidates = await ctx.db
+      .query("users")
+      .filter((q) => q.eq(q.field("re"), args.re))
+      .collect();
+    const realUserWithRe = candidates.find(
+      (u) => u.re === args.re && !u.clerkId.startsWith("pendente:")
+    );
+
+    if (realUserWithRe) {
+      // User já fez login com esse RE → vincula o tecnico a ele
+      userId = realUserWithRe._id;
+      // Atualiza dados do user pra refletir o cadastro
+      await ctx.db.patch(userId, {
+        graduacao: args.graduacao,
+        nomeDeGuerra: args.nomeDeGuerra,
+        role: "tecnico",
+        approved: true,
+      });
+    } else {
+      // Cria um user PLACEHOLDER pro tecnico (clerkId fake)
+      // Quando o tecnico real logar, o upsertUser vincula pelo RE
+      const placeholderClerkId = `pendente:${args.re}`;
+      userId = await ctx.db.insert("users", {
+        clerkId: placeholderClerkId,
+        email: `${args.re}@pendente.pmesp`,
+        name: args.nomeDeGuerra,
+        role: "tecnico",
+        graduacao: args.graduacao,
+        nomeDeGuerra: args.nomeDeGuerra,
+        re: args.re,
+        secao: "Manutenção",
+        approved: true,
+        createdAt: Date.now(),
+      });
+    }
 
     return await ctx.db.insert("tecnicos", {
-      userId: newUserId,
+      userId,
       equipeId: args.equipeId,
       graduacao: args.graduacao,
       nomeDeGuerra: args.nomeDeGuerra,
@@ -1239,6 +1311,56 @@ export const anyAdminExists = query({
       .withIndex("by_role", (q) => q.eq("role", "admin"))
       .first();
     return { exists: !!admin, admin };
+  },
+});
+
+// Corrige vínculo de técnico: associa um tecnico existente ao user REAL que logou
+// (caso o técnico tenha logado no Clerk ANTES do gestor cadastrá-lo)
+// Apenas Admin Master pode usar
+export const fixTecnicoUserLink = mutation({
+  args: { re: v.string() },
+  handler: async (ctx, args) => {
+    const currentUserId = await getCurrentUserId(ctx);
+    if (!currentUserId) throw new Error("Não autenticado");
+    const currentUser = await ctx.db
+      .query("users")
+      .withIndex("by_clerkId", (q) => q.eq("clerkId", currentUserId))
+      .first();
+    if (!currentUser || !currentUser.isAdminMaster) {
+      throw new Error("Apenas Admin Master pode usar");
+    }
+
+    // Acha o tecnico (com esse RE, ativo)
+    const tecnico = await ctx.db
+      .query("tecnicos")
+      .filter((q) => q.eq(q.field("re"), args.re))
+      .first();
+    if (!tecnico) throw new Error(`Técnico com RE ${args.re} não encontrado`);
+
+    // Acha o user REAL (com clerkId não-placeholder) com esse RE
+    const allUsers = await ctx.db
+      .query("users")
+      .filter((q) => q.eq(q.field("re"), args.re))
+      .collect();
+    const realUser = allUsers.find((u) => !u.clerkId.startsWith("pendente:"));
+    if (!realUser) throw new Error(`User real com RE ${args.re} não encontrado`);
+
+    // Atualiza o tecnico pra apontar pro user real
+    await ctx.db.patch(tecnico._id, { userId: realUser._id });
+
+    // Deleta o placeholder orfão (se existir)
+    for (const u of allUsers) {
+      if (u.clerkId.startsWith("pendente:")) {
+        await ctx.db.delete(u._id);
+      }
+    }
+
+    return {
+      ok: true,
+      tecnicoId: tecnico._id,
+      realUserId: realUser._id,
+      deletedPlaceholders: allUsers.length - 1,
+    };
   },
 });
 
