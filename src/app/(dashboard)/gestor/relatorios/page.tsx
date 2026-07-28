@@ -17,9 +17,9 @@ export default function RelatoriosPage() {
 }
 
 function RelatoriosPageContent() {
-  const stats = useQuery(api.mutations.dashboardStats);
+  const stats = useQuery(api.mutations.dashboardStats, {});
   const servicos = useQuery(api.mutations.listServicos, {});
-  const equipes = useQuery(api.mutations.listEquipes);
+  const equipes = useQuery(api.mutations.listEquipes, {});
   const tecnicos = useQuery(api.mutations.listTecnicos, {});
 
   // Cálculos adicionais

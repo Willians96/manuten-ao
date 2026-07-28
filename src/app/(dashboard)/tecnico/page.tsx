@@ -16,7 +16,7 @@ export default function TecnicoPage() {
 
 function TecnicoPageContent() {
   const servicos = useQuery(api.mutations.listServicos, {});
-  const equipes = useQuery(api.mutations.listEquipes);
+  const equipes = useQuery(api.mutations.listEquipes, {});
   const tecnicos = useQuery(api.mutations.listTecnicos, {});
   const me = useQuery(api.mutations.me);
   const iniciar = useMutation(api.mutations.iniciarServico);
