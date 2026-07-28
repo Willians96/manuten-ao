@@ -57,13 +57,27 @@ function EquipesPageContent() {
       e.preventDefault();
       void (async () => {
         try {
-          await cadastrarTecnico({
+          const result = await cadastrarTecnico({
             equipeId: equipeId as any,
             graduacao: cadTecnico.graduacao,
             nomeDeGuerra: cadTecnico.nomeDeGuerra,
             re: cadTecnico.re,
           });
           setCadTecnico({ graduacao: "", nomeDeGuerra: "", re: "" });
+          if (result && (result as any).convertedFromExistingUser) {
+            const r = result as any;
+            const prevRole = r.previousRole === "solicitante" ? "solicitante" : r.previousRole === "gestor" ? "gestor" : "outro";
+            alert(
+              `✅ ${r.userName} foi convertido de ${prevRole} para TÉCNICO!\n\n` +
+              `Ele já vai aparecer como técnico da equipe. ` +
+              `(O login dele continua o mesmo — só o perfil mudou.)`
+            );
+          } else {
+            alert(
+              `✅ Técnico cadastrado!\n\nQuando ${cadTecnico.nomeDeGuerra} (RE ${cadTecnico.re}) ` +
+              `fizer o primeiro login, o cadastro é vinculado automaticamente.`
+            );
+          }
         } catch (e: any) { alert(e.message); }
       })();
     };

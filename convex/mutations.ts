@@ -1349,6 +1349,8 @@ export const cadastrarTecnico = mutation({
     if (realUserWithRe) {
       // User já fez login com esse RE → vincula o tecnico a ele
       userId = realUserWithRe._id;
+      // Guarda o role antigo pro feedback
+      const previousRole = realUserWithRe.role;
       // Atualiza dados do user pra refletir o cadastro
       await ctx.db.patch(userId, {
         graduacao: args.graduacao,
@@ -1356,6 +1358,23 @@ export const cadastrarTecnico = mutation({
         role: "tecnico",
         approved: true,
       });
+
+      const tecnicoId = await ctx.db.insert("tecnicos", {
+        userId,
+        equipeId: args.equipeId,
+        graduacao: args.graduacao,
+        nomeDeGuerra: args.nomeDeGuerra,
+        re: args.re,
+        ativo: true,
+        status: "ativo" as const,
+        createdAt: Date.now(),
+      });
+      return {
+        tecnicoId,
+        convertedFromExistingUser: true,
+        previousRole,
+        userName: realUserWithRe.name,
+      };
     } else {
       // Cria um user PLACEHOLDER pro tecnico (clerkId fake)
       // Quando o tecnico real logar, o upsertUser vincula pelo RE
