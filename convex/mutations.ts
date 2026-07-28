@@ -1,9 +1,9 @@
-import { v } from "convex/values";
+﻿import { v } from "convex/values";
 import { Id } from "./_generated/dataModel";
 import { mutation, query, action } from "./_generated/server";
 import { getCurrentUserId } from "./auth";
 
-// ── Helper: envia push notification via FCM HTTP v1 API ────────────────
+// â”€â”€ Helper: envia push notification via FCM HTTP v1 API â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // Requer variavel de ambiente FCM_SERVICE_ACCOUNT_JSON (JSON da Service Account)
 //
 // Cache simples de access_token (60 min)
@@ -16,7 +16,7 @@ async function getAccessToken(): Promise<string | null> {
     return null;
   }
 
-  // Usa cache se ainda válido (com 5min de margem)
+  // Usa cache se ainda vÃ¡lido (com 5min de margem)
   if (cachedToken && cachedToken.expiresAt > Date.now() + 5 * 60 * 1000) {
     return cachedToken.token;
   }
@@ -164,8 +164,8 @@ export const saveFcmToken = mutation({
   },
 });
 
-// Funções usadas pela httpAction (não exigem auth Clerk)
-// Validação de segurança fica na httpAction (via appSecret)
+// FunÃ§Ãµes usadas pela httpAction (nÃ£o exigem auth Clerk)
+// ValidaÃ§Ã£o de seguranÃ§a fica na httpAction (via appSecret)
 export const findUserByClerkIdPublic = query({
   args: { clerkId: v.string() },
   handler: async (ctx, args) => {
@@ -185,7 +185,7 @@ export const setFcmTokenByUserIdPublic = mutation({
 });
 
 
-// ── Queries ──────────────────────────────────────────────────────────────
+// â”€â”€ Queries â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export const me = query({
   args: {},
@@ -202,6 +202,7 @@ export const me = query({
 export const listServicos = query({
   args: {
     status: v.optional(v.string()),
+    modalidade: v.optional(v.union(v.literal("servicos_gerais"), v.literal("informatica"))),
   },
   handler: async (ctx, args) => {
     const currentUserId = await getCurrentUserId(ctx);
@@ -214,18 +215,24 @@ export const listServicos = query({
 
     if (!user) return [];
 
-    let q = ctx.db.query("servicos").order("desc");
-
+    // Filtro por modalidade (se passada, usa Ã­ndice; senÃ£o, filtra em memÃ³ria)
+    let q: any = ctx.db.query("servicos").order("desc");
+    if (args.modalidade) {
+      q = ctx.db
+        .query("servicos")
+        .withIndex("by_modalidade", (q: any) => q.eq("modalidade", args.modalidade))
+        .order("desc");
+    }
     if (args.status) {
       q = ctx.db
         .query("servicos")
-        .withIndex("by_status", (q) => q.eq("status", args.status as any))
+        .withIndex("by_status", (q: any) => q.eq("status", args.status))
         .order("desc");
     }
 
     const servicos = await q.collect();
 
-    // Tecnicos veem só os serviços da própria equipe
+    // Tecnicos veem sÃ³ os serviÃ§os da prÃ³pria equipe
     // EXCETO pausados: pausados aparecem pra QUALQUER equipe (outra equipe pode retomar)
     if (user.role === "tecnico") {
       const tecnico = await ctx.db
@@ -234,13 +241,17 @@ export const listServicos = query({
         .first();
 
       if (tecnico) {
+        const tecModalidades = (tecnico.modalidades && tecnico.modalidades.length > 0) ? tecnico.modalidades : ["servicos_gerais"];
         return servicos.filter(
-          (s) =>
-            // Pausados: qualquer técnico de qualquer equipe vê
-            (s.status === "pausado") ||
-            // Demais status (aprovado, em_andamento): só da própria equipe
-            ((s.status === "aprovado" || s.status === "em_andamento") &&
-             s.equipeId === tecnico.equipeId)
+          (s: any) =>
+            tecModalidades.includes(s.modalidade ?? "servicos_gerais") &&
+            (
+              // Pausados: qualquer tÃ©cnico de qualquer equipe vÃª
+              (s.status === "pausado") ||
+              // Demais status (aprovado, em_andamento): sÃ³ da prÃ³pria equipe
+              ((s.status === "aprovado" || s.status === "em_andamento") &&
+               s.equipeId === tecnico.equipeId)
+            )
         );
       }
       return [];
@@ -251,12 +262,24 @@ export const listServicos = query({
 });
 
 export const listTecnicos = query({
-  args: { equipeId: v.optional(v.id("equipes")) },
+  args: {
+    equipeId: v.optional(v.id("equipes")),
+    modalidade: v.optional(v.union(v.literal("servicos_gerais"), v.literal("informatica"))),
+  },
   handler: async (ctx, args) => {
-    const tecnicos = await (args.equipeId
+    let tecnicos = await (args.equipeId
       ? ctx.db.query("tecnicos").withIndex("by_equipe", (q) => q.eq("equipeId", args.equipeId as Id<"equipes">))
       : ctx.db.query("tecnicos")
     ).collect();
+
+    // Filtra por modalidade se passado (in-memory, pois modalidades Ã© array)
+    if (args.modalidade) {
+      tecnicos = tecnicos.filter((t) => {
+        const mods = (t.modalidades && t.modalidades.length > 0) ? t.modalidades : ["servicos_gerais"];
+        return mods.includes(args.modalidade!);
+      });
+    }
+
     // Traz user info
     const withUser = await Promise.all(
       tecnicos.map(async (t) => ({
@@ -269,26 +292,46 @@ export const listTecnicos = query({
 });
 
 export const listEquipes = query({
-  args: {},
-  handler: async (ctx) => {
-    return await ctx.db.query("equipes").collect();
+  args: {
+    modalidade: v.optional(v.union(v.literal("servicos_gerais"), v.literal("informatica"))),
+  },
+  handler: async (ctx, args) => {
+    const all = await ctx.db.query("equipes").collect();
+    if (args.modalidade) {
+      return all.filter((e) => (e.modalidade ?? "servicos_gerais") === args.modalidade);
+    }
+    return all;
   },
 });
 
 export const dashboardStats = query({
-  args: {},
-  handler: async (ctx) => {
-    const servicos = await ctx.db.query("servicos").collect();
-    const tecnicos = await ctx.db.query("tecnicos").collect();
-    const equipes = await ctx.db.query("equipes").collect();
+  args: {
+    modalidade: v.optional(v.union(v.literal("servicos_gerais"), v.literal("informatica"))),
+  },
+  handler: async (ctx, args) => {
+    // Filtra por modalidade (se passada)
+    let allEquipes = await ctx.db.query("equipes").collect();
+    let allTecnicos = await ctx.db.query("tecnicos").collect();
+    if (args.modalidade) {
+      allEquipes = allEquipes.filter((e) => (e.modalidade ?? "servicos_gerais") === args.modalidade);
+      const equipeIdsFiltradas = new Set(allEquipes.map((e) => e._id));
+      allTecnicos = allTecnicos.filter((t) => equipeIdsFiltradas.has(t.equipeId));
+    }
+    let allServicos = await ctx.db.query("servicos").collect();
+    if (args.modalidade) {
+      allServicos = allServicos.filter((s) => (s.modalidade ?? "servicos_gerais") === args.modalidade);
+    }
+    const equipesFiltradas = allEquipes;
+    const tecnicosFiltrados = allTecnicos;
+    const servicosFiltrados = allServicos;
 
     // Conta por equipe
     const porEquipe: Record<string, { total: number; concluido: number; emAndamento: number; pausado: number }> = {};
-    for (const eq of equipes) {
+    for (const eq of equipesFiltradas) {
       porEquipe[eq._id] = { total: 0, concluido: 0, emAndamento: 0, pausado: 0 };
     }
 
-    for (const s of servicos) {
+    for (const s of servicosFiltrados) {
       if (s.equipeId && porEquipe[s.equipeId]) {
         porEquipe[s.equipeId].total++;
         if (s.status === "concluido") porEquipe[s.equipeId].concluido++;
@@ -297,18 +340,8 @@ export const dashboardStats = query({
       }
     }
 
-    // Tempos médios (serviceLogs)
-    const serviceLogs = await ctx.db.query("serviceLogs").collect();
-    const tempos: Record<string, number[]> = {};
-
-    for (const log of serviceLogs) {
-      if (!tempos[log.servicoId]) tempos[log.servicoId] = [];
-    }
-
-    const servicosConcluidos = await ctx.db
-      .query("servicos")
-      .withIndex("by_status", (q) => q.eq("status", "concluido"))
-      .collect();
+    // Tempos mÃ©dios (serviceLogs) - sÃ³ dos serviÃ§os filtrados
+    const servicosConcluidos = servicosFiltrados.filter((s) => s.status === "concluido");
 
     const avgDurations = await Promise.all(
       servicosConcluidos.map(async (s) => {
@@ -330,13 +363,13 @@ export const dashboardStats = query({
         : 0;
 
     return {
-      total: servicos.length,
-      pendente: servicos.filter((s) => s.status === "pendente").length,
-      emAndamento: servicos.filter((s) => s.status === "em_andamento").length,
-      pausado: servicos.filter((s) => s.status === "pausado").length,
-      concluido: servicos.filter((s) => s.status === "concluido").length,
+      total: servicosFiltrados.length,
+      pendente: servicosFiltrados.filter((s) => s.status === "pendente").length,
+      emAndamento: servicosFiltrados.filter((s) => s.status === "em_andamento").length,
+      pausado: servicosFiltrados.filter((s) => s.status === "pausado").length,
+      concluido: servicosFiltrados.filter((s) => s.status === "concluido").length,
       porEquipe,
-      equipes,
+      equipes: equipesFiltradas,
       tempoMedioMin,
     };
   },
@@ -360,7 +393,7 @@ export const pendingUsers = query({
   },
 });
 
-// ── Mutations ────────────────────────────────────────────────────────────
+// â”€â”€ Mutations â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export const upsertUser = mutation({
   args: {
@@ -387,8 +420,8 @@ export const upsertUser = mutation({
       .first();
 
     if (existing) {
-      // User JÁ EXISTE - só atualiza dados básicos, NÃO mexe em role
-      // (a role é gerenciada pelo gestor via approveUser/updateUserRole)
+      // User JÃ EXISTE - sÃ³ atualiza dados bÃ¡sicos, NÃƒO mexe em role
+      // (a role Ã© gerenciada pelo gestor via approveUser/updateUserRole)
       await ctx.db.patch(existing._id, {
         name: args.name,
         email: args.email,
@@ -399,7 +432,7 @@ export const upsertUser = mutation({
       });
       return existing._id;
     } else {
-      // ── Verifica se é um tecnico pre-cadastrado (placeholder) ──
+      // â”€â”€ Verifica se Ã© um tecnico pre-cadastrado (placeholder) â”€â”€
       // Se o RE bater com um placeholder criado pelo cadastrarTecnico, vincula
       if (args.re) {
         const placeholder = await ctx.db
@@ -420,7 +453,7 @@ export const upsertUser = mutation({
         }
       }
 
-      // ── Primeiro acesso: vira admin master automaticamente ──
+      // â”€â”€ Primeiro acesso: vira admin master automaticamente â”€â”€
       const totalUsers = await ctx.db.query("users").take(2);
       const isFirstUser = totalUsers.length === 0;
       const isAdminMaster = isFirstUser;
@@ -456,13 +489,13 @@ export const approveUser = mutation({
   },
   handler: async (ctx, args) => {
     const currentUserId = await getCurrentUserId(ctx);
-    if (!currentUserId) throw new Error("Não autenticado");
+    if (!currentUserId) throw new Error("NÃ£o autenticado");
     const user = await ctx.db
       .query("users")
       .withIndex("by_clerkId", (q) => q.eq("clerkId", currentUserId))
       .first();
     if (!user || (user.role !== "gestor" && user.role !== "admin")) {
-      throw new Error("Não autorizado");
+      throw new Error("NÃ£o autorizado");
     }
     await ctx.db.patch(args.userId, {
       approved: true,
@@ -471,7 +504,7 @@ export const approveUser = mutation({
   },
 });
 
-// Atualizar role de um usuário já aprovado (e suspender/reativar)
+// Atualizar role de um usuÃ¡rio jÃ¡ aprovado (e suspender/reativar)
 export const updateUserRole = mutation({
   args: {
     userId: v.id("users"),
@@ -485,19 +518,19 @@ export const updateUserRole = mutation({
   },
   handler: async (ctx, args) => {
     const currentUserId = await getCurrentUserId(ctx);
-    if (!currentUserId) throw new Error("Não autenticado");
+    if (!currentUserId) throw new Error("NÃ£o autenticado");
     const user = await ctx.db
       .query("users")
       .withIndex("by_clerkId", (q) => q.eq("clerkId", currentUserId))
       .first();
     if (!user || (user.role !== "gestor" && user.role !== "admin")) {
-      throw new Error("Não autorizado");
+      throw new Error("NÃ£o autorizado");
     }
     const target = await ctx.db.get(args.userId);
-    if (!target) throw new Error("Usuário não encontrado");
-    // Não pode rebaixar o próprio admin master (proteção)
+    if (!target) throw new Error("UsuÃ¡rio nÃ£o encontrado");
+    // NÃ£o pode rebaixar o prÃ³prio admin master (proteÃ§Ã£o)
     if (target.isAdminMaster && target._id !== user._id) {
-      throw new Error("Não é possível alterar o Admin Master");
+      throw new Error("NÃ£o Ã© possÃ­vel alterar o Admin Master");
     }
     const updates: any = { role: args.role };
     if (args.approved !== undefined) updates.approved = args.approved;
@@ -505,50 +538,50 @@ export const updateUserRole = mutation({
   },
 });
 
-// Excluir usuário PERMANENTEMENTE - SÓ Admin Master
+// Excluir usuÃ¡rio PERMANENTEMENTE - SÃ“ Admin Master
 export const deleteUser = mutation({
   args: { userId: v.id("users") },
   handler: async (ctx, args) => {
     const currentUserId = await getCurrentUserId(ctx);
-    if (!currentUserId) throw new Error("Não autenticado");
+    if (!currentUserId) throw new Error("NÃ£o autenticado");
     const user = await ctx.db
       .query("users")
       .withIndex("by_clerkId", (q) => q.eq("clerkId", currentUserId))
       .first();
-    if (!user) throw new Error("Não autorizado");
+    if (!user) throw new Error("NÃ£o autorizado");
     if (user.isAdminMaster !== true) {
-      throw new Error("Apenas o Admin Master pode excluir usuários");
+      throw new Error("Apenas o Admin Master pode excluir usuÃ¡rios");
     }
     const target = await ctx.db.get(args.userId);
-    if (!target) throw new Error("Usuário não encontrado");
-    // Proteções
+    if (!target) throw new Error("UsuÃ¡rio nÃ£o encontrado");
+    // ProteÃ§Ãµes
     if (target._id === user._id) {
-      throw new Error("Você não pode excluir a si mesmo");
+      throw new Error("VocÃª nÃ£o pode excluir a si mesmo");
     }
     if (target.isAdminMaster) {
-      throw new Error("Não é possível excluir o Admin Master");
+      throw new Error("NÃ£o Ã© possÃ­vel excluir o Admin Master");
     }
-    // Verifica se tem serviços vinculados
+    // Verifica se tem serviÃ§os vinculados
     const servicos = await ctx.db
       .query("servicos")
       .withIndex("by_solicitante", (q) => q.eq("solicitanteId", args.userId))
       .collect();
     if (servicos.length > 0) {
-      throw new Error(`Usuário tem ${servicos.length} serviço(s) vinculado(s). Use "Excluir em cascata" pra apagar tudo junto.`);
+      throw new Error(`UsuÃ¡rio tem ${servicos.length} serviÃ§o(s) vinculado(s). Use "Excluir em cascata" pra apagar tudo junto.`);
     }
-    // Verifica se é técnico
+    // Verifica se Ã© tÃ©cnico
     const tecnicos = await ctx.db
       .query("tecnicos")
       .withIndex("by_user", (q) => q.eq("userId", args.userId))
       .collect();
     if (tecnicos.length > 0) {
-      throw new Error("Usuário é técnico cadastrado. Exclua-o na página de Equipes primeiro.");
+      throw new Error("UsuÃ¡rio Ã© tÃ©cnico cadastrado. Exclua-o na pÃ¡gina de Equipes primeiro.");
     }
     await ctx.db.delete(args.userId);
   },
 });
 
-// Debug: lista todos os users (apenas pra diagnóstico)
+// Debug: lista todos os users (apenas pra diagnÃ³stico)
 export const debugListUsers = query({
   args: {},
   handler: async (ctx) => {
@@ -570,7 +603,7 @@ export const debugListUsers = query({
   },
 });
 
-// Debug: lista os logs do app (FCM, login, etc) - últimos 50
+// Debug: lista os logs do app (FCM, login, etc) - Ãºltimos 50
 export const debugListLogs = query({
   args: { source: v.optional(v.string()) },
   handler: async (ctx, args) => {
@@ -583,7 +616,7 @@ export const debugListLogs = query({
   },
 });
 
-// Public mutation usada pela httpAction fcmDebugLog (não exige auth)
+// Public mutation usada pela httpAction fcmDebugLog (nÃ£o exige auth)
 export const addDebugLogPublic = mutation({
   args: {
     source: v.string(),
@@ -629,9 +662,9 @@ export const criarServicoAdminPublic = mutation({
     dataFimExec: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    // Valida que o user existe e é admin
+    // Valida que o user existe e Ã© admin
     const admin = await ctx.db.get(args.criadoPorUserId);
-    if (!admin) throw new Error("User admin não encontrado");
+    if (!admin) throw new Error("User admin nÃ£o encontrado");
     if (admin.role !== "admin" || !admin.isAdminMaster) {
       throw new Error("Apenas Admin Master pode usar");
     }
@@ -660,13 +693,13 @@ export const criarServicoAdminPublic = mutation({
       updatedAt: Date.now(),
     });
 
-    // Log de início (se tiver dataInicioExec)
+    // Log de inÃ­cio (se tiver dataInicioExec)
     if (args.dataInicioExec) {
       await ctx.db.insert("serviceLogs", {
         servicoId,
         tecnicoId: args.tecnicoId,
         acao: "inicio",
-        observacao: `Cadastro retroativo — início: ${args.dataInicioExec}`,
+        observacao: `Cadastro retroativo â€” inÃ­cio: ${args.dataInicioExec}`,
         createdAt: new Date(args.dataInicioExec).getTime(),
       });
     }
@@ -676,7 +709,7 @@ export const criarServicoAdminPublic = mutation({
         servicoId,
         tecnicoId: args.tecnicoId,
         acao: "fim",
-        observacao: `Cadastro retroativo — fim: ${args.dataFimExec}`,
+        observacao: `Cadastro retroativo â€” fim: ${args.dataFimExec}`,
         createdAt: new Date(args.dataFimExec).getTime(),
       });
     }
@@ -801,7 +834,7 @@ export const patchTecnicoEquipePublic = mutation({
   },
 });
 
-// Queries/mutations públicas usadas pela httpAction /runMigration (correção de vínculo)
+// Queries/mutations pÃºblicas usadas pela httpAction /runMigration (correÃ§Ã£o de vÃ­nculo)
 export const findTecnicoByRePublic = query({
   args: { re: v.string() },
   handler: async (ctx, args) => {
@@ -849,12 +882,12 @@ export const deletePlaceholderUsersByRePublic = mutation({
   },
 });
 
-// Limpa o FCM token de um user (só admin master) - usado na página de debug
+// Limpa o FCM token de um user (sÃ³ admin master) - usado na pÃ¡gina de debug
 export const clearFcmTokenAdmin = mutation({
   args: { userId: v.id("users") },
   handler: async (ctx, args) => {
     const currentUserId = await getCurrentUserId(ctx);
-    if (!currentUserId) throw new Error("Não autenticado");
+    if (!currentUserId) throw new Error("NÃ£o autenticado");
     const currentUser = await ctx.db
       .query("users")
       .withIndex("by_clerkId", (q) => q.eq("clerkId", currentUserId))
@@ -867,32 +900,32 @@ export const clearFcmTokenAdmin = mutation({
   },
 });
 
-// Excluir usuário EM CASCATA - SÓ Admin Master
-// Apaga TUDO do user: serviços onde foi solicitante, técnicos vinculados, e o user
-// (serviços onde o user é TÉCNICO não são apagados - só ficam sem responsável)
+// Excluir usuÃ¡rio EM CASCATA - SÃ“ Admin Master
+// Apaga TUDO do user: serviÃ§os onde foi solicitante, tÃ©cnicos vinculados, e o user
+// (serviÃ§os onde o user Ã© TÃ‰CNICO nÃ£o sÃ£o apagados - sÃ³ ficam sem responsÃ¡vel)
 export const forceDeleteUser = mutation({
   args: { userId: v.id("users") },
   handler: async (ctx, args) => {
     const currentUserId = await getCurrentUserId(ctx);
-    if (!currentUserId) throw new Error("Não autenticado");
+    if (!currentUserId) throw new Error("NÃ£o autenticado");
     const user = await ctx.db
       .query("users")
       .withIndex("by_clerkId", (q) => q.eq("clerkId", currentUserId))
       .first();
-    if (!user) throw new Error("Não autorizado");
+    if (!user) throw new Error("NÃ£o autorizado");
     if (user.isAdminMaster !== true) {
-      throw new Error("Apenas o Admin Master pode excluir usuários");
+      throw new Error("Apenas o Admin Master pode excluir usuÃ¡rios");
     }
     const target = await ctx.db.get(args.userId);
-    if (!target) throw new Error("Usuário não encontrado");
+    if (!target) throw new Error("UsuÃ¡rio nÃ£o encontrado");
     if (target._id === user._id) {
-      throw new Error("Você não pode excluir a si mesmo");
+      throw new Error("VocÃª nÃ£o pode excluir a si mesmo");
     }
     if (target.isAdminMaster) {
-      throw new Error("Não é possível excluir o Admin Master");
+      throw new Error("NÃ£o Ã© possÃ­vel excluir o Admin Master");
     }
 
-    // 1. Apaga técnicos do user (e seus serviceLogs)
+    // 1. Apaga tÃ©cnicos do user (e seus serviceLogs)
     const tecnicos = await ctx.db
       .query("tecnicos")
       .withIndex("by_user", (q) => q.eq("userId", args.userId))
@@ -908,7 +941,7 @@ export const forceDeleteUser = mutation({
       await ctx.db.delete(t._id);
     }
 
-    // 2. Apaga serviços onde o user foi solicitante
+    // 2. Apaga serviÃ§os onde o user foi solicitante
     const servicos = await ctx.db
       .query("servicos")
       .withIndex("by_solicitante", (q) => q.eq("solicitanteId", args.userId))
@@ -926,7 +959,7 @@ export const forceDeleteUser = mutation({
 
     // 3. Apaga o user
     await ctx.db.delete(args.userId);
-    return { ok: true, message: "Usuário e dependências excluídos" };
+    return { ok: true, message: "UsuÃ¡rio e dependÃªncias excluÃ­dos" };
   },
 });
 
@@ -941,17 +974,25 @@ export const criarServico = mutation({
       v.literal("alta"),
       v.literal("critica")
     ),
+    modalidade: v.optional(
+      v.union(
+        v.literal("servicos_gerais"),
+        v.literal("informatica")
+      )
+    ),
   },
   handler: async (ctx, args) => {
     const userId = await getCurrentUserId(ctx);
-    if (!userId) throw new Error("Não autenticado");
+    if (!userId) throw new Error("NÃ£o autenticado");
 
     const user = await ctx.db
       .query("users")
       .withIndex("by_clerkId", (q) => q.eq("clerkId", userId))
       .first();
 
-    if (!user || !user.approved) throw new Error("Usuário não aprovado");
+    if (!user || !user.approved) throw new Error("UsuÃ¡rio nÃ£o aprovado");
+
+    const modalidade = args.modalidade ?? "servicos_gerais";
 
     const newId = await ctx.db.insert("servicos", {
       solicitanteId: user._id,
@@ -959,6 +1000,7 @@ export const criarServico = mutation({
       descricao: args.descricao,
       local: args.local,
       urgencia: args.urgencia,
+      modalidade: modalidade,
       status: "pendente",
       createdAt: Date.now(),
     });
@@ -977,7 +1019,7 @@ export const criarServico = mutation({
       .filter((t): t is string => !!t);
     await sendPushNotification(
       ctx, tokens,
-      "🔔 Novo serviço aguardando aprovação",
+      "ðŸ”” Novo serviÃ§o aguardando aprovaÃ§Ã£o",
       `${user.graduacao ?? ""} ${user.nomeDeGuerra ?? user.name}: ${args.titulo}`,
       "/gestor"
     );
@@ -996,7 +1038,7 @@ export const atribuirServico = mutation({
   },
   handler: async (ctx, args) => {
     const userId = await getCurrentUserId(ctx);
-    if (!userId) throw new Error("Não autenticado");
+    if (!userId) throw new Error("NÃ£o autenticado");
 
     const user = await ctx.db
       .query("users")
@@ -1004,13 +1046,38 @@ export const atribuirServico = mutation({
       .first();
 
     if (!user || (user.role !== "gestor" && user.role !== "admin")) {
-      throw new Error("Não autorizado");
+      throw new Error("NÃ£o autorizado");
     }
 
     const servico = await ctx.db.get(args.servicoId);
-    if (!servico) throw new Error("Serviço não encontrado");
+    if (!servico) throw new Error("ServiÃ§o nÃ£o encontrado");
 
-    // Se estava pausado, mantém pausado (equipe nova vai retomar)
+    // Valida que a equipe Ã© da mesma modalidade do serviÃ§o
+    const equipeDoServico = await ctx.db.get(args.equipeId);
+    if (!equipeDoServico) throw new Error("Equipe nÃ£o encontrada");
+    const servicoModalidade = servico.modalidade ?? "servicos_gerais";
+    if (equipeDoServico.modalidade && equipeDoServico.modalidade !== servicoModalidade) {
+      throw new Error(
+        `A equipe "${equipeDoServico.nome}" Ã© de ${equipeDoServico.modalidade === "informatica" ? "InformÃ¡tica" : "ServiÃ§os Gerais"}, ` +
+        `mas o serviÃ§o Ã© de ${servicoModalidade === "informatica" ? "InformÃ¡tica" : "ServiÃ§os Gerais"}. ` +
+        `Selecione uma equipe da mesma modalidade.`
+      );
+    }
+
+    // Valida que o tÃ©cnico (se especÃ­fico) pode atuar nessa modalidade
+    if (args.tecnicoId) {
+      const tec = await ctx.db.get(args.tecnicoId);
+      if (!tec) throw new Error("TÃ©cnico nÃ£o encontrado");
+      const tecModalidades = (tec.modalidades && tec.modalidades.length > 0) ? tec.modalidades : ["servicos_gerais"];
+      if (!tecModalidades.includes(servicoModalidade)) {
+        throw new Error(
+          `Este tÃ©cnico nÃ£o atua em ${servicoModalidade === "informatica" ? "InformÃ¡tica" : "ServiÃ§os Gerais"}. ` +
+          `Selecione um tÃ©cnico dessa modalidade.`
+        );
+      }
+    }
+
+    // Se estava pausado, mantÃ©m pausado (equipe nova vai retomar)
     // Se era pendente, volta pra aprovado
     const novoStatus = servico.status === "pausado" ? "pausado" : "aprovado";
 
@@ -1023,7 +1090,7 @@ export const atribuirServico = mutation({
       updatedAt: Date.now(),
     });
 
-    // PUSH: notifica o técnico (se específico) ou todos da equipe
+    // PUSH: notifica o tÃ©cnico (se especÃ­fico) ou todos da equipe
     const tokens: string[] = [];
     if (args.tecnicoId) {
       const tec = await ctx.db.get(args.tecnicoId);
@@ -1032,7 +1099,7 @@ export const atribuirServico = mutation({
         if (userTec?.fcmToken) tokens.push(userTec.fcmToken);
       }
     } else {
-      // Notifica todos os técnicos ativos da equipe
+      // Notifica todos os tÃ©cnicos ativos da equipe
       const tecs = await ctx.db
         .query("tecnicos")
         .withIndex("by_equipe", (q) => q.eq("equipeId", args.equipeId))
@@ -1044,11 +1111,11 @@ export const atribuirServico = mutation({
         }
       }
     }
-    const equipe = await ctx.db.get(args.equipeId);
+    const equipePraNotif = await ctx.db.get(args.equipeId);
     await sendPushNotification(
       ctx, tokens,
-      "🔧 Novo serviço atribuído",
-      `${servico.titulo} — ${equipe?.nome ?? "equipe"}`,
+      "ðŸ”§ Novo serviÃ§o atribuÃ­do",
+      `${servico.titulo} â€” ${equipePraNotif?.nome ?? "equipe"}`,
       "/tecnico"
     );
   },
@@ -1061,25 +1128,25 @@ export const pausarServico = mutation({
   },
   handler: async (ctx, args) => {
     const userId = await getCurrentUserId(ctx);
-    if (!userId) throw new Error("Não autenticado");
+    if (!userId) throw new Error("NÃ£o autenticado");
 
     const user = await ctx.db
       .query("users")
       .withIndex("by_clerkId", (q) => q.eq("clerkId", userId))
       .first();
 
-    if (!user || user.role !== "tecnico") throw new Error("Não autorizado");
+    if (!user || user.role !== "tecnico") throw new Error("NÃ£o autorizado");
 
     const tecnico = await ctx.db
       .query("tecnicos")
       .withIndex("by_user", (q) => q.eq("userId", user._id))
       .first();
 
-    if (!tecnico) throw new Error("Técnico não cadastrado");
+    if (!tecnico) throw new Error("TÃ©cnico nÃ£o cadastrado");
 
     const servico = await ctx.db.get(args.servicoId);
     if (!servico || servico.equipeId !== tecnico.equipeId) {
-      throw new Error("Serviço não pertence à sua equipe");
+      throw new Error("ServiÃ§o nÃ£o pertence Ã  sua equipe");
     }
 
     await ctx.db.patch(args.servicoId, {
@@ -1093,7 +1160,7 @@ export const pausarServico = mutation({
       servicoId: args.servicoId,
       tecnicoId: tecnico._id,
       acao: "observacao",
-      observacao: `⏸ Pausado: ${args.motivo}`,
+      observacao: `â¸ Pausado: ${args.motivo}`,
       createdAt: Date.now(),
     });
   },
@@ -1103,28 +1170,28 @@ export const retomarServico = mutation({
   args: { servicoId: v.id("servicos") },
   handler: async (ctx, args) => {
     const userId = await getCurrentUserId(ctx);
-    if (!userId) throw new Error("Não autenticado");
+    if (!userId) throw new Error("NÃ£o autenticado");
 
     const user = await ctx.db
       .query("users")
       .withIndex("by_clerkId", (q) => q.eq("clerkId", userId))
       .first();
 
-    if (!user || user.role !== "tecnico") throw new Error("Não autorizado");
+    if (!user || user.role !== "tecnico") throw new Error("NÃ£o autorizado");
 
     const tecnico = await ctx.db
       .query("tecnicos")
       .withIndex("by_user", (q) => q.eq("userId", user._id))
       .first();
 
-    if (!tecnico) throw new Error("Técnico não cadastrado");
+    if (!tecnico) throw new Error("TÃ©cnico nÃ£o cadastrado");
 
     const servico = await ctx.db.get(args.servicoId);
-    if (!servico) throw new Error("Serviço não encontrado");
+    if (!servico) throw new Error("ServiÃ§o nÃ£o encontrado");
 
-    // Se NÃO é pausado, mantém regra original: só a equipe responsável pode retomar
+    // Se NÃƒO Ã© pausado, mantÃ©m regra original: sÃ³ a equipe responsÃ¡vel pode retomar
     if (servico.status !== "pausado" && servico.equipeId !== tecnico.equipeId) {
-      throw new Error("Serviço não pertence à sua equipe");
+      throw new Error("ServiÃ§o nÃ£o pertence Ã  sua equipe");
     }
 
     // Servico pausado: qualquer tecnico de qualquer equipe pode retomar
@@ -1135,7 +1202,7 @@ export const retomarServico = mutation({
     await ctx.db.patch(args.servicoId, {
       status: "em_andamento",
       tecnicoId: tecnico._id,
-      equipeId: tecnico.equipeId, // transfere pra equipe que está retomando
+      equipeId: tecnico.equipeId, // transfere pra equipe que estÃ¡ retomando
       motivoPausa: undefined,
       pausadoEm: undefined,
       updatedAt: Date.now(),
@@ -1146,8 +1213,8 @@ export const retomarServico = mutation({
       tecnicoId: tecnico._id,
       acao: "inicio",
       observacao: transferido
-        ? `▶️ Retomado por outra equipe (anterior: ${equipeAnterior})`
-        : "▶️ Retomado",
+        ? `â–¶ï¸ Retomado por outra equipe (anterior: ${equipeAnterior})`
+        : "â–¶ï¸ Retomado",
       createdAt: Date.now(),
     });
   },
@@ -1157,29 +1224,29 @@ export const iniciarServico = mutation({
   args: { servicoId: v.id("servicos") },
   handler: async (ctx, args) => {
     const userId = await getCurrentUserId(ctx);
-    if (!userId) throw new Error("Não autenticado");
+    if (!userId) throw new Error("NÃ£o autenticado");
 
     const user = await ctx.db
       .query("users")
       .withIndex("by_clerkId", (q) => q.eq("clerkId", userId))
       .first();
 
-    if (!user || user.role !== "tecnico") throw new Error("Não autorizado");
+    if (!user || user.role !== "tecnico") throw new Error("NÃ£o autorizado");
 
     const tecnico = await ctx.db
       .query("tecnicos")
       .withIndex("by_user", (q) => q.eq("userId", user._id))
       .first();
 
-    if (!tecnico) throw new Error("Técnico não cadastrado");
+    if (!tecnico) throw new Error("TÃ©cnico nÃ£o cadastrado");
 
     const servico = await ctx.db.get(args.servicoId);
     if (!servico || servico.equipeId !== tecnico.equipeId) {
-      throw new Error("Serviço não pertence à sua equipe");
+      throw new Error("ServiÃ§o nÃ£o pertence Ã  sua equipe");
     }
-    // Se já tem tecnicoId definido (específico), só esse pode iniciar
+    // Se jÃ¡ tem tecnicoId definido (especÃ­fico), sÃ³ esse pode iniciar
     if (servico.tecnicoId && servico.tecnicoId !== tecnico._id) {
-      throw new Error("Este serviço está atribuído a outro técnico da sua equipe");
+      throw new Error("Este serviÃ§o estÃ¡ atribuÃ­do a outro tÃ©cnico da sua equipe");
     }
 
     await ctx.db.patch(args.servicoId, {
@@ -1204,21 +1271,21 @@ export const encerrarServico = mutation({
   },
   handler: async (ctx, args) => {
     const userId = await getCurrentUserId(ctx);
-    if (!userId) throw new Error("Não autenticado");
+    if (!userId) throw new Error("NÃ£o autenticado");
 
     const user = await ctx.db
       .query("users")
       .withIndex("by_clerkId", (q) => q.eq("clerkId", userId))
       .first();
 
-    if (!user || user.role !== "tecnico") throw new Error("Não autorizado");
+    if (!user || user.role !== "tecnico") throw new Error("NÃ£o autorizado");
 
     const tecnico = await ctx.db
       .query("tecnicos")
       .withIndex("by_user", (q) => q.eq("userId", user._id))
       .first();
 
-    if (!tecnico) throw new Error("Técnico não cadastrado");
+    if (!tecnico) throw new Error("TÃ©cnico nÃ£o cadastrado");
 
     await ctx.db.patch(args.servicoId, {
       status: "concluido",
@@ -1233,7 +1300,7 @@ export const encerrarServico = mutation({
       createdAt: Date.now(),
     });
 
-    // PUSH: notifica o gestor e o solicitante (só se NÃO for cadastroDireto)
+    // PUSH: notifica o gestor e o solicitante (sÃ³ se NÃƒO for cadastroDireto)
     const servico = await ctx.db.get(args.servicoId);
     if (servico && !servico.cadastroDireto) {
       const tokens: string[] = [];
@@ -1249,15 +1316,15 @@ export const encerrarServico = mutation({
       for (const u of [...gestores, ...admins]) {
         if (u.fcmToken) tokens.push(u.fcmToken);
       }
-      // Solicitante (só se não for cadastroDireto - aí tem user real)
+      // Solicitante (sÃ³ se nÃ£o for cadastroDireto - aÃ­ tem user real)
       if (servico.solicitanteId) {
         const sol = await ctx.db.get(servico.solicitanteId);
         if (sol?.fcmToken) tokens.push(sol.fcmToken);
       }
       await sendPushNotification(
         ctx, tokens,
-        "✅ Serviço concluído",
-        `${servico.titulo} — por ${tecnico.graduacao} ${tecnico.nomeDeGuerra}`,
+        "âœ… ServiÃ§o concluÃ­do",
+        `${servico.titulo} â€” por ${tecnico.graduacao} ${tecnico.nomeDeGuerra}`,
         "/gestor"
       );
     }
@@ -1268,7 +1335,7 @@ export const criarEquipe = mutation({
   args: { nome: v.string() },
   handler: async (ctx, args) => {
     const userId = await getCurrentUserId(ctx);
-    if (!userId) throw new Error("Não autenticado");
+    if (!userId) throw new Error("NÃ£o autenticado");
 
     const user = await ctx.db
       .query("users")
@@ -1276,7 +1343,7 @@ export const criarEquipe = mutation({
       .first();
 
     if (!user || (user.role !== "gestor" && user.role !== "admin")) {
-      throw new Error("Não autorizado");
+      throw new Error("NÃ£o autorizado");
     }
 
     return await ctx.db.insert("equipes", {
@@ -1298,34 +1365,40 @@ export const criarServicoDireto = mutation({
       v.literal("alta"),
       v.literal("critica")
     ),
+    modalidade: v.optional(
+      v.union(
+        v.literal("servicos_gerais"),
+        v.literal("informatica")
+      )
+    ),
     // dados do solicitante
     solicitanteNome: v.string(),
     solicitanteGraduacao: v.string(),
     solicitanteNomeDeGuerra: v.string(),
     solicitanteRe: v.string(),
     solicitanteSecao: v.string(),
-    // datas de execução
+    // datas de execuÃ§Ã£o
     dataInicioExec: v.optional(v.string()),
     dataFimExec: v.optional(v.string()),
-    // pra admin master escolher equipe + técnico quando não tem vínculo
+    // pra admin master escolher equipe + tÃ©cnico quando nÃ£o tem vÃ­nculo
     equipeId: v.optional(v.id("equipes")),
     tecnicoId: v.optional(v.id("tecnicos")),
   },
   handler: async (ctx, args) => {
     const userId = await getCurrentUserId(ctx);
-    if (!userId) throw new Error("Não autenticado");
+    if (!userId) throw new Error("NÃ£o autenticado");
 
     const user = await ctx.db
       .query("users")
       .withIndex("by_clerkId", (q) => q.eq("clerkId", userId))
       .first();
 
-    if (!user) throw new Error("Não autorizado");
+    if (!user) throw new Error("NÃ£o autorizado");
     if (user.role !== "tecnico" && user.role !== "admin") {
-      throw new Error("Apenas técnicos e Admin Master podem fazer cadastro direto");
+      throw new Error("Apenas tÃ©cnicos e Admin Master podem fazer cadastro direto");
     }
 
-    // Pra técnico: usa o próprio vínculo
+    // Pra tÃ©cnico: usa o prÃ³prio vÃ­nculo
     // Pra admin: usa o tecnicoId/equipeId passado
     let equipeIdFinal: any;
     let tecnicoIdFinal: any;
@@ -1335,18 +1408,18 @@ export const criarServicoDireto = mutation({
         .query("tecnicos")
         .withIndex("by_user", (q) => q.eq("userId", user._id))
         .first();
-      if (!tecnico) throw new Error("Técnico não cadastrado em nenhuma equipe");
+      if (!tecnico) throw new Error("TÃ©cnico nÃ£o cadastrado em nenhuma equipe");
       equipeIdFinal = tecnico.equipeId;
       tecnicoIdFinal = tecnico._id;
     } else {
       // admin master
       if (!args.equipeId) throw new Error("Admin Master precisa informar a equipe");
-      if (!args.tecnicoId) throw new Error("Admin Master precisa informar o técnico");
+      if (!args.tecnicoId) throw new Error("Admin Master precisa informar o tÃ©cnico");
       equipeIdFinal = args.equipeId;
       tecnicoIdFinal = args.tecnicoId;
     }
 
-    // Se forneceu dataFim → já nasce concluído
+    // Se forneceu dataFim â†’ jÃ¡ nasce concluÃ­do
     const status = args.dataFimExec ? "concluido" : "em_andamento";
 
     const servicoId = await ctx.db.insert("servicos", {
@@ -1372,13 +1445,13 @@ export const criarServicoDireto = mutation({
       updatedAt: Date.now(),
     });
 
-    // Log de início
+    // Log de inÃ­cio
     if (args.dataInicioExec) {
       await ctx.db.insert("serviceLogs", {
         servicoId,
         tecnicoId: tecnicoIdFinal,
         acao: "inicio",
-        observacao: `Cadastro direto — início: ${args.dataInicioExec}`,
+        observacao: `Cadastro direto â€” inÃ­cio: ${args.dataInicioExec}`,
         createdAt: new Date(args.dataInicioExec).getTime(),
       });
     }
@@ -1389,7 +1462,7 @@ export const criarServicoDireto = mutation({
         servicoId,
         tecnicoId: tecnicoIdFinal,
         acao: "fim",
-        observacao: `Cadastro direto — fim: ${args.dataFimExec}`,
+        observacao: `Cadastro direto â€” fim: ${args.dataFimExec}`,
         createdAt: new Date(args.dataFimExec).getTime(),
       });
     }
@@ -1404,10 +1477,18 @@ export const cadastrarTecnico = mutation({
     graduacao: v.string(),
     nomeDeGuerra: v.string(),
     re: v.string(),
+    modalidades: v.optional(
+      v.array(
+        v.union(
+          v.literal("servicos_gerais"),
+          v.literal("informatica")
+        )
+      )
+    ),
   },
   handler: async (ctx, args) => {
     const currentUserId = await getCurrentUserId(ctx);
-    if (!currentUserId) throw new Error("Não autenticado");
+    if (!currentUserId) throw new Error("NÃ£o autenticado");
 
     const currentUser = await ctx.db
       .query("users")
@@ -1415,36 +1496,41 @@ export const cadastrarTecnico = mutation({
       .first();
 
     if (!currentUser || (currentUser.role !== "gestor" && currentUser.role !== "admin")) {
-      throw new Error("Não autorizado");
+      throw new Error("NÃ£o autorizado");
     }
 
-    // Verifica se já existe um tecnico com esse RE
+    // Verifica se jÃ¡ existe um tecnico com esse RE
     const existingTecnico = await ctx.db
       .query("tecnicos")
       .filter((q) => q.eq(q.field("re"), args.re))
       .first();
 
     if (existingTecnico) {
-      // Se já existe o RE: atualiza SÓ se for da MESMA equipe
-      // (se for de outra equipe, é o mesmo PM com RE duplicado — não mexe)
+      // Se jÃ¡ existe o RE: atualiza SÃ“ se for da MESMA equipe
+      // (se for de outra equipe, Ã© o mesmo PM com RE duplicado â€” nÃ£o mexe)
       if (existingTecnico.equipeId === args.equipeId) {
-        await ctx.db.patch(existingTecnico._id, {
+        // Modalidades: atualiza se informado, senÃ£o mantÃ©m as existentes
+        const update: any = {
           graduacao: args.graduacao,
           nomeDeGuerra: args.nomeDeGuerra,
           ativo: true,
-        });
+        };
+        if (args.modalidades && args.modalidades.length > 0) {
+          update.modalidades = args.modalidades;
+        }
+        await ctx.db.patch(existingTecnico._id, update);
         return existingTecnico._id;
       }
-      // RE existe em outra equipe → throw
+      // RE existe em outra equipe â†’ throw
       throw new Error(
-        `Já existe um técnico com RE ${args.re} em outra equipe. Use o botão "Editar" para movê-lo.`
+        `JÃ¡ existe um tÃ©cnico com RE ${args.re} em outra equipe. Use o botÃ£o "Editar" para movÃª-lo.`
       );
     }
 
-    // Verifica se já existe um USER (não-placeholder) com esse RE
-    // (Pode acontecer do técnico ter logado no Clerk ANTES do gestor cadastrá-lo)
+    // Verifica se jÃ¡ existe um USER (nÃ£o-placeholder) com esse RE
+    // (Pode acontecer do tÃ©cnico ter logado no Clerk ANTES do gestor cadastrÃ¡-lo)
     let userId: Id<"users">;
-    // Sem índice by_re (pra evitar migration de schema), usa filter + first
+    // Sem Ã­ndice by_re (pra evitar migration de schema), usa filter + first
     const candidates = await ctx.db
       .query("users")
       .filter((q) => q.eq(q.field("re"), args.re))
@@ -1454,7 +1540,7 @@ export const cadastrarTecnico = mutation({
     );
 
     if (realUserWithRe) {
-      // User já fez login com esse RE → vincula o tecnico a ele
+      // User jÃ¡ fez login com esse RE â†’ vincula o tecnico a ele
       userId = realUserWithRe._id;
       // Guarda o role antigo pro feedback
       const previousRole = realUserWithRe.role;
@@ -1466,6 +1552,13 @@ export const cadastrarTecnico = mutation({
         approved: true,
       });
 
+      // Modalidades: se nÃ£o informado, define baseado na equipe
+      let modalidades: any = args.modalidades;
+      if (!modalidades || modalidades.length === 0) {
+        const equipeTecReal = await ctx.db.get(args.equipeId);
+        modalidades = equipeTecReal?.modalidade ? [equipeTecReal.modalidade] : ["servicos_gerais"];
+      }
+
       const tecnicoId = await ctx.db.insert("tecnicos", {
         userId,
         equipeId: args.equipeId,
@@ -1474,6 +1567,7 @@ export const cadastrarTecnico = mutation({
         re: args.re,
         ativo: true,
         status: "ativo" as const,
+        modalidades,
         createdAt: Date.now(),
       });
       return {
@@ -1494,10 +1588,17 @@ export const cadastrarTecnico = mutation({
         graduacao: args.graduacao,
         nomeDeGuerra: args.nomeDeGuerra,
         re: args.re,
-        secao: "Manutenção",
+        secao: "ManutenÃ§Ã£o",
         approved: true,
         createdAt: Date.now(),
       });
+    }
+
+    // Modalidades: se nÃ£o informado, define baseado na equipe
+    let modalidades: any = args.modalidades;
+    if (!modalidades || modalidades.length === 0) {
+      const equipeTecFinal = await ctx.db.get(args.equipeId);
+      modalidades = equipeTecFinal?.modalidade ? [equipeTecFinal.modalidade] : ["servicos_gerais"];
     }
 
     return await ctx.db.insert("tecnicos", {
@@ -1508,6 +1609,7 @@ export const cadastrarTecnico = mutation({
       re: args.re,
       ativo: true,
       status: "ativo" as const,
+      modalidades,
       createdAt: Date.now(),
     });
   },
@@ -1525,14 +1627,14 @@ export const anyAdminExists = query({
   },
 });
 
-// Corrige vínculo de técnico: associa um tecnico existente ao user REAL que logou
-// (caso o técnico tenha logado no Clerk ANTES do gestor cadastrá-lo)
+// Corrige vÃ­nculo de tÃ©cnico: associa um tecnico existente ao user REAL que logou
+// (caso o tÃ©cnico tenha logado no Clerk ANTES do gestor cadastrÃ¡-lo)
 // Apenas Admin Master pode usar
 export const fixTecnicoUserLink = mutation({
   args: { re: v.string() },
   handler: async (ctx, args) => {
     const currentUserId = await getCurrentUserId(ctx);
-    if (!currentUserId) throw new Error("Não autenticado");
+    if (!currentUserId) throw new Error("NÃ£o autenticado");
     const currentUser = await ctx.db
       .query("users")
       .withIndex("by_clerkId", (q) => q.eq("clerkId", currentUserId))
@@ -1546,20 +1648,20 @@ export const fixTecnicoUserLink = mutation({
       .query("tecnicos")
       .filter((q) => q.eq(q.field("re"), args.re))
       .first();
-    if (!tecnico) throw new Error(`Técnico com RE ${args.re} não encontrado`);
+    if (!tecnico) throw new Error(`TÃ©cnico com RE ${args.re} nÃ£o encontrado`);
 
-    // Acha o user REAL (com clerkId não-placeholder) com esse RE
+    // Acha o user REAL (com clerkId nÃ£o-placeholder) com esse RE
     const allUsers = await ctx.db
       .query("users")
       .filter((q) => q.eq(q.field("re"), args.re))
       .collect();
     const realUser = allUsers.find((u) => !u.clerkId.startsWith("pendente:"));
-    if (!realUser) throw new Error(`User real com RE ${args.re} não encontrado`);
+    if (!realUser) throw new Error(`User real com RE ${args.re} nÃ£o encontrado`);
 
     // Atualiza o tecnico pra apontar pro user real
     await ctx.db.patch(tecnico._id, { userId: realUser._id });
 
-    // Deleta o placeholder orfão (se existir)
+    // Deleta o placeholder orfÃ£o (se existir)
     for (const u of allUsers) {
       if (u.clerkId.startsWith("pendente:")) {
         await ctx.db.delete(u._id);
@@ -1586,12 +1688,12 @@ export const forceAdminMaster = mutation({
   args: {},
   handler: async (ctx) => {
     const userId = await getCurrentUserId(ctx);
-    if (!userId) throw new Error("N�o autenticado");
+    if (!userId) throw new Error("Nï¿½o autenticado");
     const user = await ctx.db
       .query("users")
       .withIndex("by_clerkId", (q) => q.eq("clerkId", userId))
       .first();
-    if (!user) throw new Error("User n�o existe no banco. Preencha o perfil em /pendente primeiro.");
+    if (!user) throw new Error("User nï¿½o existe no banco. Preencha o perfil em /pendente primeiro.");
     await ctx.db.patch(user._id, {
       role: "admin",
       approved: true,
@@ -1634,30 +1736,42 @@ export const editarTecnico = mutation({
     re: v.string(),
     equipeId: v.id("equipes"),
     ativo: v.boolean(),
+    modalidades: v.optional(
+      v.array(
+        v.union(
+          v.literal("servicos_gerais"),
+          v.literal("informatica")
+        )
+      )
+    ),
   },
   handler: async (ctx, args) => {
     const currentUserId = await getCurrentUserId(ctx);
-    if (!currentUserId) throw new Error("N�o autenticado");
+    if (!currentUserId) throw new Error("Nï¿½o autenticado");
 
     const currentUser = await ctx.db
       .query("users")
       .withIndex("by_clerkId", (q) => q.eq("clerkId", currentUserId))
       .first();
     if (!currentUser || (currentUser.role !== "gestor" && currentUser.role !== "admin")) {
-      throw new Error("N�o autorizado");
+      throw new Error("Nï¿½o autorizado");
     }
 
     const tecnico = await ctx.db.get(args.tecnicoId);
-    if (!tecnico) throw new Error("T�cnico n�o encontrado");
+    if (!tecnico) throw new Error("Tï¿½cnico nï¿½o encontrado");
 
     // Atualiza o tecnico
-    await ctx.db.patch(args.tecnicoId, {
+    const update: any = {
       graduacao: args.graduacao,
       nomeDeGuerra: args.nomeDeGuerra,
       re: args.re,
       equipeId: args.equipeId,
       ativo: args.ativo,
-    });
+    };
+    if (args.modalidades && args.modalidades.length > 0) {
+      update.modalidades = args.modalidades;
+    }
+    await ctx.db.patch(args.tecnicoId, update);
 
     // Sincroniza os dados no user placeholder (se for placeholder)
     const user = await ctx.db.get(tecnico.userId);
@@ -1678,20 +1792,20 @@ export const excluirTecnico = mutation({
   args: { tecnicoId: v.id("tecnicos") },
   handler: async (ctx, args) => {
     const currentUserId = await getCurrentUserId(ctx);
-    if (!currentUserId) throw new Error("N�o autenticado");
+    if (!currentUserId) throw new Error("Nï¿½o autenticado");
 
     const currentUser = await ctx.db
       .query("users")
       .withIndex("by_clerkId", (q) => q.eq("clerkId", currentUserId))
       .first();
     if (!currentUser || (currentUser.role !== "gestor" && currentUser.role !== "admin")) {
-      throw new Error("N�o autorizado");
+      throw new Error("Nï¿½o autorizado");
     }
 
     const tecnico = await ctx.db.get(args.tecnicoId);
-    if (!tecnico) throw new Error("T�cnico n�o encontrado");
+    if (!tecnico) throw new Error("Tï¿½cnico nï¿½o encontrado");
 
-    // Verifica se h� servi�os pendentes atribu�dos a este tecnico
+    // Verifica se hï¿½ serviï¿½os pendentes atribuï¿½dos a este tecnico
     const servicosPendentes = await ctx.db
       .query("servicos")
       .withIndex("by_status", (q) => q.eq("status", "em_andamento"))
@@ -1699,7 +1813,7 @@ export const excluirTecnico = mutation({
       .first();
 
     if (servicosPendentes) {
-      throw new Error("N�o � poss�vel excluir: t�cnico tem servi�os em andamento");
+      throw new Error("Nï¿½o ï¿½ possï¿½vel excluir: tï¿½cnico tem serviï¿½os em andamento");
     }
 
     // Soft delete: marca como inativo
@@ -1709,18 +1823,18 @@ export const excluirTecnico = mutation({
   },
 });
 
-// -- Gest�o de Servi�os (admin/gestor) ---------------------------------------
+// -- Gestï¿½o de Serviï¿½os (admin/gestor) ---------------------------------------
 export const excluirServico = mutation({
   args: { servicoId: v.id("servicos") },
   handler: async (ctx, args) => {
     const currentUserId = await getCurrentUserId(ctx);
-    if (!currentUserId) throw new Error("N�o autenticado");
+    if (!currentUserId) throw new Error("Nï¿½o autenticado");
     const currentUser = await ctx.db
       .query("users")
       .withIndex("by_clerkId", (q) => q.eq("clerkId", currentUserId))
       .first();
     if (!currentUser || (currentUser.role !== "gestor" && currentUser.role !== "admin")) {
-      throw new Error("N�o autorizado");
+      throw new Error("Nï¿½o autorizado");
     }
     // So o admin master pode excluir permanentemente
     if (!currentUser.isAdminMaster) {
@@ -1734,7 +1848,7 @@ export const excluirServico = mutation({
     for (const log of logs) {
       await ctx.db.delete(log._id);
     }
-    // Apaga o servi�o
+    // Apaga o serviï¿½o
     await ctx.db.delete(args.servicoId);
     return { ok: true };
   },
@@ -1744,13 +1858,13 @@ export const cancelarServico = mutation({
   args: { servicoId: v.id("servicos") },
   handler: async (ctx, args) => {
     const currentUserId = await getCurrentUserId(ctx);
-    if (!currentUserId) throw new Error("N�o autenticado");
+    if (!currentUserId) throw new Error("Nï¿½o autenticado");
     const currentUser = await ctx.db
       .query("users")
       .withIndex("by_clerkId", (q) => q.eq("clerkId", currentUserId))
       .first();
     if (!currentUser || (currentUser.role !== "gestor" && currentUser.role !== "admin")) {
-      throw new Error("N�o autorizado");
+      throw new Error("Nï¿½o autorizado");
     }
     await ctx.db.patch(args.servicoId, {
       status: "cancelado",
@@ -1775,13 +1889,13 @@ export const editarServico = mutation({
   },
   handler: async (ctx, args) => {
     const currentUserId = await getCurrentUserId(ctx);
-    if (!currentUserId) throw new Error("N�o autenticado");
+    if (!currentUserId) throw new Error("Nï¿½o autenticado");
     const currentUser = await ctx.db
       .query("users")
       .withIndex("by_clerkId", (q) => q.eq("clerkId", currentUserId))
       .first();
     if (!currentUser || (currentUser.role !== "gestor" && currentUser.role !== "admin")) {
-      throw new Error("N�o autorizado");
+      throw new Error("Nï¿½o autorizado");
     }
     await ctx.db.patch(args.servicoId, {
       titulo: args.titulo,

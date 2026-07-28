@@ -3,6 +3,7 @@ import { useQuery, useMutation } from "convex/react";
 import { api } from "../../../../convex/_generated/api";
 import { useState } from "react";
 import { RoleGuard } from "../../../components/RoleGuard";
+import { useModalidade, MODALIDADES } from "../../../contexts/ModalidadeContext";
 
 export const dynamic = "force-dynamic";
 
@@ -17,6 +18,7 @@ export default function SolicitarPage() {
 function SolicitarPageContent() {
   const meusServicos = useQuery(api.mutations.listServicos, {});
   const criar = useMutation(api.mutations.criarServico);
+  const { modalidade, setModalidade } = useModalidade();
 
   const [titulo, setTitulo] = useState("");
   const [descricao, setDescricao] = useState("");
@@ -26,7 +28,11 @@ function SolicitarPageContent() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    await criar({ titulo, descricao, local, urgencia: urgencia as any });
+    await criar({
+      titulo, descricao, local,
+      urgencia: urgencia as any,
+      modalidade,
+    });
     setTitulo(""); setDescricao(""); setLocal(""); setUrgencia("media");
     setEnviado(true);
     setTimeout(() => setEnviado(false), 3000);
@@ -47,13 +53,47 @@ function SolicitarPageContent() {
           </div>
         )}
         <form onSubmit={handleSubmit}>
+          {/* Modalidade - botões grandes ANTES do título */}
+          <div className="form-group">
+            <label>Modalidade *</label>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginTop: 4 }}>
+              {MODALIDADES.map((m) => (
+                <button
+                  key={m.value}
+                  type="button"
+                  onClick={() => setModalidade(m.value)}
+                  style={{
+                    padding: "16px 12px",
+                    borderRadius: 10,
+                    border: modalidade === m.value ? `3px solid ${m.cor}` : "2px solid #e2e8f0",
+                    background: modalidade === m.value ? `${m.cor}15` : "#fff",
+                    color: modalidade === m.value ? m.cor : "#475569",
+                    fontWeight: modalidade === m.value ? 700 : 500,
+                    fontSize: 15,
+                    cursor: "pointer",
+                    transition: "all 0.15s",
+                    textAlign: "center",
+                  }}
+                >
+                  {m.label}
+                  {modalidade === m.value && (
+                    <div style={{ fontSize: 11, marginTop: 4, color: m.cor, fontWeight: 600 }}>✓ Selecionado</div>
+                  )}
+                </button>
+              ))}
+            </div>
+          </div>
+
           <div className="form-group">
             <label>Título do Serviço *</label>
             <input
               type="text"
               value={titulo}
               onChange={(e) => setTitulo(e.target.value)}
-              placeholder="Ex: Cano com vazamento no banheiro"
+              placeholder={modalidade === "informatica"
+                ? "Ex: Computador não liga, impressora travada, sem internet"
+                : "Ex: Cano com vazamento no banheiro, lâmpada queimada"
+              }
               required
             />
           </div>
@@ -63,7 +103,10 @@ function SolicitarPageContent() {
               type="text"
               value={local}
               onChange={(e) => setLocal(e.target.value)}
-              placeholder="Ex: Banheiro 2º andar, Ala B, próximo ao expurgo"
+              placeholder={modalidade === "informatica"
+                ? "Ex: Sala da TI, computador 03 do 1º andar"
+                : "Ex: Banheiro 2º andar, Ala B, próximo ao expurgo"
+              }
               required
             />
           </div>
