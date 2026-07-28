@@ -609,6 +609,91 @@ export const addDebugLogPublic = mutation({
   },
 });
 
+// Public mutation usada pela httpAction /runMigration para criar servicos retroativos
+// (servicos que aconteceram antes do sistema entrar em uso)
+export const criarServicoAdminPublic = mutation({
+  args: {
+    criadoPorUserId: v.id("users"),
+    titulo: v.string(),
+    descricao: v.string(),
+    local: v.string(),
+    urgencia: v.union(v.literal("baixa"), v.literal("media"), v.literal("alta"), v.literal("critica")),
+    equipeId: v.id("equipes"),
+    tecnicoId: v.id("tecnicos"),
+    solicitanteNome: v.string(),
+    solicitanteGraduacao: v.string(),
+    solicitanteNomeDeGuerra: v.string(),
+    solicitanteRe: v.string(),
+    solicitanteSecao: v.string(),
+    dataInicioExec: v.optional(v.string()),
+    dataFimExec: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    // Valida que o user existe e é admin
+    const admin = await ctx.db.get(args.criadoPorUserId);
+    if (!admin) throw new Error("User admin não encontrado");
+    if (admin.role !== "admin" || !admin.isAdminMaster) {
+      throw new Error("Apenas Admin Master pode usar");
+    }
+
+    const status = args.dataFimExec ? "concluido" : "em_andamento";
+    const servicoId = await ctx.db.insert("servicos", {
+      solicitanteId: args.criadoPorUserId,
+      titulo: args.titulo,
+      descricao: args.descricao,
+      local: args.local,
+      urgencia: args.urgencia,
+      status: status as any,
+      equipeId: args.equipeId,
+      tecnicoId: args.tecnicoId,
+      cadastroDireto: true,
+      dadosSolicitante: {
+        nome: args.solicitanteNome,
+        graduacao: args.solicitanteGraduacao,
+        nomeDeGuerra: args.solicitanteNomeDeGuerra,
+        re: args.solicitanteRe,
+        secao: args.solicitanteSecao,
+      },
+      dataInicioExec: args.dataInicioExec,
+      dataFimExec: args.dataFimExec,
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+    });
+
+    // Log de início (se tiver dataInicioExec)
+    if (args.dataInicioExec) {
+      await ctx.db.insert("serviceLogs", {
+        servicoId,
+        tecnicoId: args.tecnicoId,
+        acao: "inicio",
+        observacao: `Cadastro retroativo — início: ${args.dataInicioExec}`,
+        createdAt: new Date(args.dataInicioExec).getTime(),
+      });
+    }
+    // Log de fim (se tiver dataFimExec)
+    if (args.dataFimExec) {
+      await ctx.db.insert("serviceLogs", {
+        servicoId,
+        tecnicoId: args.tecnicoId,
+        acao: "fim",
+        observacao: `Cadastro retroativo — fim: ${args.dataFimExec}`,
+        createdAt: new Date(args.dataFimExec).getTime(),
+      });
+    }
+
+    return { ok: true, servicoId };
+  },
+});
+
+// Debug: lista todos os servicos (sem filtro de user) - pra verificar migrations
+export const debugListAllServicos = query({
+  args: {},
+  handler: async (ctx) => {
+    const servicos = await ctx.db.query("servicos").order("desc").take(50);
+    return servicos;
+  },
+});
+
 // Queries/mutations públicas usadas pela httpAction /runMigration (correção de vínculo)
 export const findTecnicoByRePublic = query({
   args: { re: v.string() },

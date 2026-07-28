@@ -221,6 +221,30 @@ const runMigration = httpAction(async (ctx, request) => {
     });
   }
 
+  if (name === "createPastService") {
+    // Cria um serviço retroativo (que aconteceu antes do sistema entrar em uso)
+    if (!migArgs) {
+      return new Response(JSON.stringify({ error: "args é obrigatório" }), {
+        status: 400,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+    const required = ["criadoPorUserId", "titulo", "descricao", "local", "urgencia", "equipeId", "tecnicoId", "solicitanteNome", "solicitanteGraduacao", "solicitanteNomeDeGuerra", "solicitanteRe", "solicitanteSecao"];
+    for (const f of required) {
+      if (!migArgs[f]) {
+        return new Response(JSON.stringify({ error: `Campo obrigatório: ${f}` }), {
+          status: 400,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+    }
+    const result = await ctx.runMutation(api.mutations.criarServicoAdminPublic, migArgs);
+    return new Response(JSON.stringify(result), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+
   return new Response(JSON.stringify({ error: `migration '${name}' not found` }), {
     status: 404,
     headers: { "Content-Type": "application/json" },
