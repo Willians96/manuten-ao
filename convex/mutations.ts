@@ -772,6 +772,35 @@ export const cadastrarTecnicoAdminPublic = mutation({
   },
 });
 
+export const setEquipeModalidadePublic = mutation({
+  args: { id: v.id("equipes"), modalidade: v.string() },
+  handler: async (ctx, args) => {
+    await ctx.db.patch(args.id, { modalidade: args.modalidade as any });
+    return { ok: true };
+  },
+});
+
+export const criarEquipeAdminPublic = mutation({
+  args: { nome: v.string(), modalidade: v.optional(v.string()) },
+  handler: async (ctx, args) => {
+    const id = await ctx.db.insert("equipes", {
+      nome: args.nome,
+      modalidade: args.modalidade as any,
+      ativo: true,
+      createdAt: Date.now(),
+    });
+    return { equipeId: id };
+  },
+});
+
+export const patchTecnicoEquipePublic = mutation({
+  args: { id: v.id("tecnicos"), equipeId: v.id("equipes") },
+  handler: async (ctx, args) => {
+    await ctx.db.patch(args.id, { equipeId: args.equipeId });
+    return { ok: true };
+  },
+});
+
 // Queries/mutations públicas usadas pela httpAction /runMigration (correção de vínculo)
 export const findTecnicoByRePublic = query({
   args: { re: v.string() },

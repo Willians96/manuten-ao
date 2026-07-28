@@ -258,6 +258,62 @@ const runMigration = httpAction(async (ctx, request) => {
     });
   }
 
+  if (name === "criarEquipeTIeMoverWilliam") {
+    // Cria a equipe "Telemática" (modalidade=informatica) e move o William pra lá
+    // Garante que Equipe A/B continuam como servicos_gerais
+
+    // 1. Atualiza equipes existentes pra terem modalidade servicos_gerais (retroativo)
+    const allEquipes = await ctx.runQuery(api.mutations.listEquipesPublic, {});
+    let equipesUpdated = 0;
+    let equipeTICreated = null;
+    for (const eq of allEquipes) {
+      if (!eq.modalidade) {
+        await ctx.runMutation(api.mutations.setEquipeModalidadePublic, {
+          id: eq._id,
+          modalidade: "servicos_gerais",
+        });
+        equipesUpdated++;
+      }
+    }
+    // 2. Verifica se equipe "Telemática" já existe
+    const telematica = allEquipes.find((e: any) => e.nome === "Telemática");
+    if (telematica) {
+      // Garante que tem modalidade informatica
+      if (telematica.modalidade !== "informatica") {
+        await ctx.runMutation(api.mutations.setEquipeModalidadePublic, {
+          id: telematica._id,
+          modalidade: "informatica",
+        });
+      }
+      equipeTICreated = telematica;
+    } else {
+      // Cria a equipe "Telemática"
+      const result = await ctx.runMutation(api.mutations.criarEquipeAdminPublic, {
+        nome: "Telemática",
+        modalidade: "informatica",
+      });
+      equipeTICreated = { _id: result.equipeId, nome: "Telemática", modalidade: "informatica" };
+    }
+    // 3. Acha o tecnico William (RE 111926-5) e move pra Telemática
+    const williamTecnico = await ctx.runQuery(api.mutations.findTecnicoByReAndEquipePublic, { re: "111926-5" });
+    if (williamTecnico) {
+      await ctx.runMutation(api.mutations.patchTecnicoEquipePublic, {
+        id: williamTecnico._id,
+        equipeId: equipeTICreated._id,
+      });
+    }
+    return new Response(JSON.stringify({
+      ok: true,
+      message: "Equipe Telemática criada/atualizada e William movido pra lá",
+      equipeTI: equipeTICreated,
+      williamTecnicoId: williamTecnico?._id,
+      equipesUpdated,
+    }), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+
   if (name === "cadastrarWilliamComoTecnicoTI") {
     // Cadastra William (admin master, RE 111926-5) como técnico de TI na Equipe A
     // (vamos usar a Equipe A por padrão, pode mudar depois)

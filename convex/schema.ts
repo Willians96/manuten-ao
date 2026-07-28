@@ -31,8 +31,16 @@ export default defineSchema({
 
   // ── Equipes ───────────────────────────────────────────────────────────
   // Regime 12x36 — uma equipe trabalha, a outra descansa.
+  // `modalidade` indica a qual sistema a equipe pertence (SG ou TI).
+  // Cada equipe é de UMA modalidade (não tem equipe "mista").
   equipes: defineTable({
-    nome: v.string(), // "Equipe A" / "Equipe B"
+    nome: v.string(), // "Equipe A" / "Equipe B" / "Telemática"
+    modalidade: v.optional(
+      v.union(
+        v.literal("servicos_gerais"),
+        v.literal("informatica")
+      )
+    ), // default = "servicos_gerais" (retroativo)
     ativo: v.boolean(),
     createdAt: v.number(),
   }),
