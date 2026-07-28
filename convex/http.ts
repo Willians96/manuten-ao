@@ -221,6 +221,89 @@ const runMigration = httpAction(async (ctx, request) => {
     });
   }
 
+  if (name === "setDefaultModalidades") {
+    // Migration: seta modalidades=["servicos_gerais"] em todos os tecnicos existentes
+    // e modalidade="servicos_gerais" em todos os servicos existentes
+    const allTecnicos = await ctx.runQuery(api.mutations.listAllTecnicosPublic, {});
+    let tecnicosUpdated = 0;
+    for (const t of allTecnicos) {
+      if (!t.modalidades || t.modalidades.length === 0) {
+        await ctx.runMutation(api.mutations.setDefaultTecnicoModalidadesPublic, {
+          id: t._id,
+          modalidades: ["servicos_gerais"],
+        });
+        tecnicosUpdated++;
+      }
+    }
+    const allServicos = await ctx.runQuery(api.mutations.listAllServicosPublic, {});
+    let servicosUpdated = 0;
+    for (const s of allServicos) {
+      if (!s.modalidade) {
+        await ctx.runMutation(api.mutations.setDefaultServicoModalidadePublic, {
+          id: s._id,
+          modalidade: "servicos_gerais",
+        });
+        servicosUpdated++;
+      }
+    }
+    return new Response(JSON.stringify({
+      ok: true,
+      tecnicosUpdated,
+      servicosUpdated,
+      tecnicosTotal: allTecnicos.length,
+      servicosTotal: allServicos.length,
+    }), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+
+  if (name === "cadastrarWilliamComoTecnicoTI") {
+    // Cadastra William (admin master, RE 111926-5) como técnico de TI na Equipe A
+    // (vamos usar a Equipe A por padrão, pode mudar depois)
+    const william = await ctx.runQuery(api.mutations.findUserByRePublicSafe, { re: "111926-5" });
+    if (!william) {
+      return new Response(JSON.stringify({ error: "William (RE 111926-5) não encontrado" }), {
+        status: 404,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+    // Verifica se já é técnico
+    const existing = await ctx.runQuery(api.mutations.findTecnicoByReAndEquipePublic, { re: "111926-5" });
+    if (existing) {
+      return new Response(JSON.stringify({ ok: true, message: "William já é técnico", tecnicoId: existing._id }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+    // Pega a primeira equipe (Equipe A)
+    const equipes = await ctx.runQuery(api.mutations.listEquipesPublic, {});
+    if (equipes.length === 0) {
+      return new Response(JSON.stringify({ error: "Nenhuma equipe cadastrada" }), {
+        status: 404,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+    const equipeA = equipes[0];
+    const result = await ctx.runMutation(api.mutations.cadastrarTecnicoAdminPublic, {
+      userId: william._id,
+      equipeId: equipeA._id,
+      graduacao: "Cb",
+      nomeDeGuerra: "William",
+      re: "111926-5",
+      modalidades: ["informatica"],
+    });
+    return new Response(JSON.stringify({
+      ok: true,
+      message: "William cadastrado como técnico de TI!",
+      tecnicoId: result.tecnicoId,
+      equipe: equipeA.nome,
+    }), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+
   if (name === "createPastService") {
     // Cria um serviço retroativo (que aconteceu antes do sistema entrar em uso)
     if (!migArgs) {

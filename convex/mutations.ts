@@ -694,6 +694,84 @@ export const debugListAllServicos = query({
   },
 });
 
+// Public mutations usadas pela httpAction /runMigration (migrations de schema)
+export const setDefaultTecnicoModalidadesPublic = mutation({
+  args: { id: v.id("tecnicos"), modalidades: v.array(v.string()) },
+  handler: async (ctx, args) => {
+    await ctx.db.patch(args.id, { modalidades: args.modalidades as any });
+    return { ok: true };
+  },
+});
+
+export const setDefaultServicoModalidadePublic = mutation({
+  args: { id: v.id("servicos"), modalidade: v.string() },
+  handler: async (ctx, args) => {
+    await ctx.db.patch(args.id, { modalidade: args.modalidade as any });
+    return { ok: true };
+  },
+});
+
+export const listAllTecnicosPublic = query({
+  args: {},
+  handler: async (ctx) => ctx.db.query("tecnicos").collect(),
+});
+
+export const listAllServicosPublic = query({
+  args: {},
+  handler: async (ctx) => ctx.db.query("servicos").collect(),
+});
+
+export const findTecnicoByReAndEquipePublic = query({
+  args: { re: v.string() },
+  handler: async (ctx, args) => {
+    return await ctx.db
+      .query("tecnicos")
+      .filter((q) => q.eq(q.field("re"), args.re))
+      .first();
+  },
+});
+
+export const findUserByRePublicSafe = query({
+  args: { re: v.string() },
+  handler: async (ctx, args) => {
+    const users = await ctx.db
+      .query("users")
+      .filter((q) => q.eq(q.field("re"), args.re))
+      .collect();
+    return users.find((u) => !u.clerkId.startsWith("pendente:")) ?? null;
+  },
+});
+
+export const listEquipesPublic = query({
+  args: {},
+  handler: async (ctx) => ctx.db.query("equipes").collect(),
+});
+
+export const cadastrarTecnicoAdminPublic = mutation({
+  args: {
+    userId: v.id("users"),
+    equipeId: v.id("equipes"),
+    graduacao: v.string(),
+    nomeDeGuerra: v.string(),
+    re: v.string(),
+    modalidades: v.array(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const id = await ctx.db.insert("tecnicos", {
+      userId: args.userId,
+      equipeId: args.equipeId,
+      graduacao: args.graduacao,
+      nomeDeGuerra: args.nomeDeGuerra,
+      re: args.re,
+      ativo: true,
+      status: "ativo",
+      modalidades: args.modalidades as any,
+      createdAt: Date.now(),
+    });
+    return { tecnicoId: id };
+  },
+});
+
 // Queries/mutations públicas usadas pela httpAction /runMigration (correção de vínculo)
 export const findTecnicoByRePublic = query({
   args: { re: v.string() },

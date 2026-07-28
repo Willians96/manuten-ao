@@ -26,7 +26,8 @@ export default defineSchema({
   })
     .index("by_clerkId", ["clerkId"])
     .index("by_role", ["role"])
-    .index("by_approved", ["approved"]),
+    .index("by_approved", ["approved"])
+    .index("by_re", ["re"]),
 
   // ── Equipes ───────────────────────────────────────────────────────────
   // Regime 12x36 — uma equipe trabalha, a outra descansa.
@@ -38,6 +39,8 @@ export default defineSchema({
 
   // ── Técnicos ──────────────────────────────────────────────────────────
   // Cada policial vinculado a uma equipe.
+  // `modalidades` é um array pq o técnico pode atuar em 1+ tipos
+  // (ex: TI do CPI-7 que faz tanto informatica quanto servicos gerais)
   tecnicos: defineTable({
     userId: v.id("users"),
     equipeId: v.id("equipes"),
@@ -52,10 +55,19 @@ export default defineSchema({
         v.literal("baixa")
       )
     ), // status de trabalho: ativo (default), ferias ou baixa
+    modalidades: v.optional(
+      v.array(
+        v.union(
+          v.literal("servicos_gerais"),
+          v.literal("informatica")
+        )
+      )
+    ), // default = ["servicos_gerais"] se vazio (retroativo)
     createdAt: v.number(),
   })
     .index("by_equipe", ["equipeId"])
-    .index("by_user", ["userId"]),
+    .index("by_user", ["userId"])
+    .index("by_re", ["re"]),
 
   // ── Solicitações de serviço ────────────────────────────────────────────
   servicos: defineTable({
@@ -69,6 +81,12 @@ export default defineSchema({
       v.literal("alta"),
       v.literal("critica")
     ),
+    modalidade: v.optional(
+      v.union(
+        v.literal("servicos_gerais"),
+        v.literal("informatica")
+      )
+    ), // default = "servicos_gerais" (retroativo)
     status: v.union(
       v.literal("pendente"),       // aguardando gestor aprovar
       v.literal("aprovado"),       // aprovado, aguardando execução
@@ -108,7 +126,8 @@ export default defineSchema({
     .index("by_status", ["status"])
     .index("by_equipe", ["equipeId"])
     .index("by_solicitante", ["solicitanteId"])
-    .index("by_urgencia", ["urgencia"]),
+    .index("by_urgencia", ["urgencia"])
+    .index("by_modalidade", ["modalidade"]),
 
   // ── Log de execução ────────────────────────────────────────────────────
   // Controla início / fim do serviço pelo técnico.
