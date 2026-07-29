@@ -769,6 +769,30 @@ export const listAllServicosPublic = query({
   handler: async (ctx) => ctx.db.query("servicos").collect(),
 });
 
+// Lista tecnicos orfaos (ativo=false) - pra limpeza
+export const listTecnicosInativosPublic = query({
+  args: {},
+  handler: async (ctx) => {
+    const all = await ctx.db.query("tecnicos").collect();
+    return all.filter((t: any) => t.ativo === false);
+  },
+});
+
+// Deleta um tecnico (se nao tiver servicos vinculados)
+export const deleteTecnicoPublic = mutation({
+  args: { id: v.id("tecnicos") },
+  handler: async (ctx, args) => {
+    const tec = await ctx.db.get(args.id);
+    if (!tec) return { ok: false, error: "Tecnico nao encontrado" };
+    const servicos = await ctx.db.query("servicos").withIndex("by_tecnico", (q: any) => q.eq("tecnicoId", args.id)).collect();
+    if (servicos.length > 0) {
+      return { ok: false, error: "Tecnico tem " + servicos.length + " servicos vinculados." };
+    }
+    await ctx.db.delete(args.id);
+    return { ok: true, id: args.id, nome: tec.nomeDeGuerra };
+  },
+});
+
 export const findServicoByTituloPublic = query({
   args: { titulo: v.string() },
   handler: async (ctx, args) => {

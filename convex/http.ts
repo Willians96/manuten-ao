@@ -456,32 +456,7 @@ const runMigration = httpAction(async (ctx, request) => {
     });
   }
 
-    
-// Limpa tecnicos orfaos (ativo=false) - usado pra remover placeholders esquecidos
-export const listTecnicosInativosPublic = query({
-  args: {},
-  handler: async (ctx) => {
-    const all = await ctx.db.query("tecnicos").collect();
-    return all.filter((t: any) => t.ativo === false);
-  },
-});
-
-export const deleteTecnicoPublic = mutation({
-  args: { id: v.id("tecnicos") },
-  handler: async (ctx, args) => {
-    const tec = await ctx.db.get(args.id);
-    if (!tec) return { ok: false, error: "Tecnico nao encontrado" };
-    // Verifica se tem servicos vinculados
-    const servicos = await ctx.db.query("servicos").withIndex("by_tecnico", (q: any) => q.eq("tecnicoId", args.id)).collect();
-    if (servicos.length > 0) {
-      return { ok: false, error: "Tecnico tem " + servicos.length + " servicos vinculados. Remova-os primeiro." };
-    }
-    await ctx.db.delete(args.id);
-    return { ok: true, id: args.id, nome: tec.nomeDeGuerra };
-  },
-});
-
-  if (name === "limparTecnicosInativos") {
+    if (name === "limparTecnicosInativos") {
     // Lista tecnicos com ativo=false e que NAO tem servicos vinculados
     // Deleta eles via deleteTecnicoPublic
     const inativos = await ctx.runQuery(api.mutations.listTecnicosInativosPublic, {});
