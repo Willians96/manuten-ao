@@ -482,6 +482,45 @@ const runMigration = httpAction(async (ctx, request) => {
     });
   }
 
+  if (name === "corrigirHorariosServicos") {
+    // Ajusta dataInicioExec, dataFimExec e status de uma lista de servicos
+    // Args: { updates: [{ servicoId, dataInicioExec?, dataFimExec?, status? }] }
+    if (!migArgs || !Array.isArray(migArgs.updates) || migArgs.updates.length === 0) {
+      return new Response(JSON.stringify({ error: "updates (array) obrigatorio" }), {
+        status: 400,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+    const resultados: any[] = [];
+    for (const u of migArgs.updates) {
+      if (!u.servicoId) {
+        resultados.push({ ok: false, error: "servicoId obrigatorio" });
+        continue;
+      }
+      const servico = await ctx.runQuery(api.mutations.findServicoByIdPublic, { id: u.servicoId });
+      if (!servico) {
+        resultados.push({ ok: false, servicoId: u.servicoId, error: "Servico nao encontrado" });
+        continue;
+      }
+      const patch: any = { updatedAt: Date.now() };
+      if (u.dataInicioExec !== undefined) patch.dataInicioExec = u.dataInicioExec;
+      if (u.dataFimExec !== undefined) patch.dataFimExec = u.dataFimExec;
+      if (u.status) patch.status = u.status;
+      await ctx.db.patch(u.servicoId, patch);
+      resultados.push({ ok: true, servicoId: u.servicoId, titulo: servico.titulo, patch });
+    }
+    return new Response(JSON.stringify({
+      ok: true,
+      total: migArgs.updates.length,
+      sucessos: resultados.filter((r: any) => r.ok).length,
+      erros: resultados.filter((r: any) => !r.ok).length,
+      detalhes: resultados,
+    }), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+
   return new Response(JSON.stringify({ error: `migration '${name}' not found` }), {
     status: 404,
     headers: { "Content-Type": "application/json" },
