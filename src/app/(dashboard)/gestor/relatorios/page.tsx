@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useQuery } from "convex/react";
 import { api } from "../../../../../convex/_generated/api";
@@ -21,12 +21,13 @@ function RelatoriosPageContent() {
   const servicos = useQuery(api.mutations.listServicos, {});
   const equipes = useQuery(api.mutations.listEquipes, {});
   const tecnicos = useQuery(api.mutations.listTecnicos, {});
+  const usuarios = useQuery(api.mutations.listAllUsers, {});
 
-  // Cálculos adicionais
+  // CÃ¡lculos adicionais
   const relatorio = useMemo(() => {
     if (!servicos || !equipes || !tecnicos || !stats) return null;
 
-    // Serviços por mês (últimos 6)
+    // ServiÃ§os por mÃªs (Ãºltimos 6)
     const agora = new Date();
     const meses: { label: string; total: number; concluido: number }[] = [];
     for (let i = 5; i >= 0; i--) {
@@ -43,12 +44,12 @@ function RelatoriosPageContent() {
       });
     }
 
-    // Serviços por técnico
+    // ServiÃ§os por tÃ©cnico
     const porTecnico: { nome: string; total: number; concluido: number; duracaoMedia: number }[] = [];
     for (const t of tecnicos.filter((tc: any) => tc.ativo)) {
       const meus = servicos.filter((s: any) => s.tecnicoId === t._id);
       const concluidos = meus.filter((s: any) => s.status === "concluido");
-      // Calcula duração média (em minutos)
+      // Calcula duraÃ§Ã£o mÃ©dia (em minutos)
       let duracaoTotal = 0;
       let count = 0;
       for (const s of concluidos) {
@@ -67,7 +68,7 @@ function RelatoriosPageContent() {
       });
     }
 
-    // Serviços por local
+    // ServiÃ§os por local
     const porLocal: Record<string, number> = {};
     for (const s of servicos) {
       const local = (s as any).local || "(sem local)";
@@ -77,11 +78,23 @@ function RelatoriosPageContent() {
       .sort(([, a], [, b]) => b - a)
       .slice(0, 10);
 
-    // Serviços REALIZADOS (concluídos) por equipe com data
+    // Helper: pega o nome do solicitante do serviÃ§o (user real OU dadosSolicitante)
+    const solicitanteNome = (s: any): string => {
+      if (s.solicitanteId) {
+        const u = (usuarios ?? []).find((x: any) => x._id === s.solicitanteId);
+        if (u) return `${u.graduacao ?? ""} ${u.nomeDeGuerra ?? u.name ?? ""}`.trim();
+      }
+      if (s.dadosSolicitante) {
+        return `${s.dadosSolicitante.graduacao ?? ""} ${s.dadosSolicitante.nome ?? ""}`.trim();
+      }
+      return "â€”";
+    };
+
+    // ServiÃ§os REALIZADOS (concluÃ­dos) por equipe com data
     const concluidos = servicos.filter((s: any) => s.status === "concluido");
     const porEquipeComData: {
       equipe: string;
-      servicos: { titulo: string; data: string; tecnico: string; duracao: number; local: string }[];
+      servicos: { titulo: string; data: string; tecnico: string; duracao: number; local: string; solicitante: string }[];
     }[] = [];
     for (const eq of equipes) {
       const daEquipe = concluidos
@@ -103,9 +116,10 @@ function RelatoriosPageContent() {
           return {
             titulo: s.titulo,
             data: dataRef,
-            tecnico: tec ? `${tec.graduacao} ${tec.nomeDeGuerra}` : "—",
+            tecnico: tec ? `${tec.graduacao} ${tec.nomeDeGuerra}` : "â€”",
             duracao,
             local: s.local,
+            solicitante: solicitanteNome(s),
           };
         })
         .sort((a: any, b: any) => {
@@ -118,32 +132,32 @@ function RelatoriosPageContent() {
     }
 
     return { meses, porTecnico, locaisOrdenados, porEquipeComData };
-  }, [stats, servicos, equipes, tecnicos]);
+  }, [stats, servicos, equipes, tecnicos, usuarios]);
 
   function exportXLSX() {
     if (!servicos || !relatorio) return;
     const wb = XLSX.utils.book_new();
 
-    // ── Aba 1: Resumo ──
+    // â”€â”€ Aba 1: Resumo â”€â”€
     const resumoData = [
-      ["Relatório de Manutenção — CPI-7"],
+      ["RelatÃ³rio de ManutenÃ§Ã£o â€” CPI-7"],
       ["Gerado em", new Date().toLocaleString("pt-BR")],
       [],
       ["Indicador", "Valor"],
-      ["Total de Solicitações", stats?.total ?? 0],
+      ["Total de SolicitaÃ§Ãµes", stats?.total ?? 0],
       ["Pendentes", stats?.pendente ?? 0],
       ["Em Andamento", stats?.emAndamento ?? 0],
       ["Pausados", stats?.pausado ?? 0],
-      ["Concluídos", stats?.concluido ?? 0],
-      ["Tempo Médio (min)", stats?.tempoMedioMin ?? 0],
+      ["ConcluÃ­dos", stats?.concluido ?? 0],
+      ["Tempo MÃ©dio (min)", stats?.tempoMedioMin ?? 0],
     ];
     const wsResumo = XLSX.utils.aoa_to_sheet(resumoData);
     wsResumo["!cols"] = [{ wch: 25 }, { wch: 20 }];
     XLSX.utils.book_append_sheet(wb, wsResumo, "Resumo");
 
-    // ── Aba 2: Por Equipe ──
+    // â”€â”€ Aba 2: Por Equipe â”€â”€
     const porEquipeData: any[][] = [
-      ["Equipe", "Total", "Concluídos", "Em Andamento", "Pausados", "Taxa de Conclusão (%)"],
+      ["Equipe", "Total", "ConcluÃ­dos", "Em Andamento", "Pausados", "Taxa de ConclusÃ£o (%)"],
     ];
     (equipes ?? []).forEach((eq: any) => {
       const s = stats?.porEquipe?.[eq._id] ?? { total: 0, concluido: 0, emAndamento: 0, pausado: 0 };
@@ -154,43 +168,43 @@ function RelatoriosPageContent() {
     wsEquipe["!cols"] = [{ wch: 20 }, { wch: 8 }, { wch: 12 }, { wch: 14 }, { wch: 10 }, { wch: 18 }];
     XLSX.utils.book_append_sheet(wb, wsEquipe, "Por Equipe");
 
-    // ── Aba 3: Produtividade por Técnico ──
+    // â”€â”€ Aba 3: Produtividade por TÃ©cnico â”€â”€
     const porTecnicoData: any[][] = [
-      ["Técnico", "Total Atribuído", "Concluídos", "Tempo Médio (min)"],
+      ["TÃ©cnico", "Total AtribuÃ­do", "ConcluÃ­dos", "Tempo MÃ©dio (min)"],
     ];
     relatorio.porTecnico
       .filter((t) => t.total > 0)
       .sort((a, b) => b.concluido - a.concluido)
       .forEach((t) => {
-        porTecnicoData.push([t.nome, t.total, t.concluido, t.duracaoMedia > 0 ? t.duracaoMedia : "—"]);
+        porTecnicoData.push([t.nome, t.total, t.concluido, t.duracaoMedia > 0 ? t.duracaoMedia : "â€”"]);
       });
     const wsTec = XLSX.utils.aoa_to_sheet(porTecnicoData);
     wsTec["!cols"] = [{ wch: 25 }, { wch: 15 }, { wch: 12 }, { wch: 16 }];
     XLSX.utils.book_append_sheet(wb, wsTec, "Por Tecnico");
 
-    // ── Aba 4: Serviços Realizados por Equipe (uma seção por equipe) ──
+    // â”€â”€ Aba 4: ServiÃ§os Realizados por Equipe (uma seÃ§Ã£o por equipe) â”€â”€
     relatorio.porEquipeComData.forEach((grupo) => {
       const data: any[][] = [
-        [`SERVIÇOS REALIZADOS — ${grupo.equipe.toUpperCase()}`],
+        [`SERVIÃ‡OS REALIZADOS â€” ${grupo.equipe.toUpperCase()}`],
         [],
-        ["Data", "Serviço", "Local", "Técnico", "Duração (min)"],
+        ["Data", "ServiÃ§o", "Local", "Solicitante", "TÃ©cnico", "DuraÃ§Ã£o (min)"],
       ];
       if (grupo.servicos.length === 0) {
-        data.push(["—", "Nenhum serviço concluído por esta equipe", "—", "—", "—"]);
+        data.push(["â€”", "Nenhum serviÃ§o concluÃ­do por esta equipe", "â€”", "â€”", "â€”", "â€”"]);
       } else {
         grupo.servicos.forEach((s) => {
-          data.push([s.data, s.titulo, s.local, s.tecnico, s.duracao > 0 ? s.duracao : "—"]);
+          data.push([s.data, s.titulo, s.local, s.solicitante, s.tecnico, s.duracao > 0 ? s.duracao : "â€”"]);
         });
       }
       const ws = XLSX.utils.aoa_to_sheet(data);
-      ws["!cols"] = [{ wch: 12 }, { wch: 40 }, { wch: 25 }, { wch: 20 }, { wch: 14 }];
+      ws["!cols"] = [{ wch: 12 }, { wch: 40 }, { wch: 25 }, { wch: 22 }, { wch: 20 }, { wch: 14 }];
       const sheetName = grupo.equipe.replace(/[^\w]/g, "").slice(0, 28) || "Equipe";
       XLSX.utils.book_append_sheet(wb, ws, sheetName);
     });
 
-    // ── Aba final: Todos os Serviços (lista completa) ──
+    // â”€â”€ Aba final: Todos os ServiÃ§os (lista completa) â”€â”€
     const todosData: any[][] = [
-      ["ID", "Título", "Local", "Urgência", "Status", "Equipe", "Cadastro", "Início Exec", "Fim Exec"],
+      ["ID", "TÃ­tulo", "Local", "UrgÃªncia", "Status", "Solicitante", "Equipe", "Cadastro", "InÃ­cio Exec", "Fim Exec"],
     ];
     servicos.forEach((s: any) => {
       todosData.push([
@@ -199,6 +213,7 @@ function RelatoriosPageContent() {
         s.local,
         s.urgencia,
         s.status,
+        solicitanteNome(s),
         s.equipeId ? equipeNome(s.equipeId) : "",
         new Date(s._creationTime).toLocaleString("pt-BR"),
         s.dataInicioExec ?? "",
@@ -206,7 +221,7 @@ function RelatoriosPageContent() {
       ]);
     });
     const wsTodos = XLSX.utils.aoa_to_sheet(todosData);
-    wsTodos["!cols"] = [{ wch: 8 }, { wch: 40 }, { wch: 25 }, { wch: 12 }, { wch: 14 }, { wch: 18 }, { wch: 20 }, { wch: 18 }, { wch: 18 }];
+    wsTodos["!cols"] = [{ wch: 8 }, { wch: 40 }, { wch: 25 }, { wch: 12 }, { wch: 14 }, { wch: 22 }, { wch: 18 }, { wch: 20 }, { wch: 18 }, { wch: 18 }];
     XLSX.utils.book_append_sheet(wb, wsTodos, "Todos os Servicos");
 
     // Gera e baixa o arquivo
@@ -235,23 +250,23 @@ function RelatoriosPageContent() {
   return (
     <div className="page-container" style={{ maxWidth: 1100 }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20, flexWrap: "wrap", gap: 12 }}>
-        <h1 className="page-title" style={{ margin: 0 }}>📊 Relatórios</h1>
+        <h1 className="page-title" style={{ margin: 0 }}>ðŸ“Š RelatÃ³rios</h1>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-          <button onClick={exportXLSX} className="btn btn-primary">📥 Exportar Excel</button>
-          <button onClick={printPage} className="btn btn-outline">🖨 Imprimir</button>
+          <button onClick={exportXLSX} className="btn btn-primary">ðŸ“¥ Exportar Excel</button>
+          <button onClick={printPage} className="btn btn-outline">ðŸ–¨ Imprimir</button>
         </div>
       </div>
 
       {/* Resumo Geral */}
       <div className="card" style={{ marginBottom: 24, pageBreakAfter: "always" }}>
-        <h2 style={{ fontSize: 18, marginBottom: 12, color: "#003882" }}>📈 Resumo Geral</h2>
+        <h2 style={{ fontSize: 18, marginBottom: 12, color: "#003882" }}>ðŸ“ˆ Resumo Geral</h2>
         <p style={{ color: "#6b7280", fontSize: 13, marginBottom: 16 }}>
           Gerado em {new Date().toLocaleString("pt-BR")}
         </p>
         <div className="stat-grid">
           <div className="stat-card">
             <div className="value">{stats?.total ?? 0}</div>
-            <div className="label">Total de Solicitações</div>
+            <div className="label">Total de SolicitaÃ§Ãµes</div>
           </div>
           <div className="stat-card">
             <div className="value" style={{ color: "#92400e" }}>{stats?.pendente ?? 0}</div>
@@ -267,27 +282,27 @@ function RelatoriosPageContent() {
           </div>
           <div className="stat-card">
             <div className="value" style={{ color: "#003882" }}>{stats?.concluido ?? 0}</div>
-            <div className="label">Concluídos</div>
+            <div className="label">ConcluÃ­dos</div>
           </div>
           <div className="stat-card">
             <div className="value" style={{ color: "#6b7280", fontSize: 20 }}>{stats?.tempoMedioMin ?? 0} min</div>
-            <div className="label">Tempo Médio</div>
+            <div className="label">Tempo MÃ©dio</div>
           </div>
         </div>
       </div>
 
       {/* Por Equipe */}
       <div className="card" style={{ marginBottom: 24, pageBreakAfter: "always" }}>
-        <h2 style={{ fontSize: 18, marginBottom: 12, color: "#003882" }}>👥 Por Equipe</h2>
+        <h2 style={{ fontSize: 18, marginBottom: 12, color: "#003882" }}>ðŸ‘¥ Por Equipe</h2>
         <table>
           <thead>
             <tr>
               <th>Equipe</th>
               <th>Total</th>
-              <th>Concluídos</th>
+              <th>ConcluÃ­dos</th>
               <th>Em Andamento</th>
               <th>Pausados</th>
-              <th>Taxa de Conclusão</th>
+              <th>Taxa de ConclusÃ£o</th>
             </tr>
           </thead>
           <tbody>
@@ -316,16 +331,16 @@ function RelatoriosPageContent() {
         </table>
       </div>
 
-      {/* Por Técnico */}
+      {/* Por TÃ©cnico */}
       <div className="card" style={{ marginBottom: 24, pageBreakAfter: "always" }}>
-        <h2 style={{ fontSize: 18, marginBottom: 12, color: "#003882" }}>🔧 Produtividade por Técnico</h2>
+        <h2 style={{ fontSize: 18, marginBottom: 12, color: "#003882" }}>ðŸ”§ Produtividade por TÃ©cnico</h2>
         <table>
           <thead>
             <tr>
-              <th>Técnico</th>
-              <th>Total Atribuído</th>
-              <th>Concluídos</th>
-              <th>Tempo Médio</th>
+              <th>TÃ©cnico</th>
+              <th>Total AtribuÃ­do</th>
+              <th>ConcluÃ­dos</th>
+              <th>Tempo MÃ©dio</th>
             </tr>
           </thead>
           <tbody>
@@ -337,13 +352,13 @@ function RelatoriosPageContent() {
                   <td><strong>{t.nome}</strong></td>
                   <td>{t.total}</td>
                   <td style={{ color: "#166534" }}>{t.concluido}</td>
-                  <td>{t.duracaoMedia > 0 ? `${t.duracaoMedia} min` : "—"}</td>
+                  <td>{t.duracaoMedia > 0 ? `${t.duracaoMedia} min` : "â€”"}</td>
                 </tr>
               ))}
             {relatorio.porTecnico.filter((t) => t.total > 0).length === 0 && (
               <tr>
                 <td colSpan={4} style={{ textAlign: "center", color: "#6b7280", padding: 20 }}>
-                  Nenhum técnico atendeu serviços ainda.
+                  Nenhum tÃ©cnico atendeu serviÃ§os ainda.
                 </td>
               </tr>
             )}
@@ -351,15 +366,15 @@ function RelatoriosPageContent() {
         </table>
       </div>
 
-      {/* Histórico mensal */}
+      {/* HistÃ³rico mensal */}
       <div className="card" style={{ marginBottom: 24 }}>
-        <h2 style={{ fontSize: 18, marginBottom: 12, color: "#003882" }}>📅 Últimos 6 meses</h2>
+        <h2 style={{ fontSize: 18, marginBottom: 12, color: "#003882" }}>ðŸ“… Ãšltimos 6 meses</h2>
         <table>
           <thead>
             <tr>
-              <th>Mês</th>
-              <th>Solicitações</th>
-              <th>Concluídos</th>
+              <th>MÃªs</th>
+              <th>SolicitaÃ§Ãµes</th>
+              <th>ConcluÃ­dos</th>
               <th>Taxa</th>
             </tr>
           </thead>
@@ -378,12 +393,12 @@ function RelatoriosPageContent() {
 
       {/* Top Locais */}
       <div className="card" style={{ marginBottom: 24 }}>
-        <h2 style={{ fontSize: 18, marginBottom: 12, color: "#003882" }}>📍 Top 10 Locais com mais Solicitações</h2>
+        <h2 style={{ fontSize: 18, marginBottom: 12, color: "#003882" }}>ðŸ“ Top 10 Locais com mais SolicitaÃ§Ãµes</h2>
         <table>
           <thead>
             <tr>
               <th>Local</th>
-              <th>Solicitações</th>
+              <th>SolicitaÃ§Ãµes</th>
             </tr>
           </thead>
           <tbody>
@@ -396,7 +411,7 @@ function RelatoriosPageContent() {
             {relatorio.locaisOrdenados.length === 0 && (
               <tr>
                 <td colSpan={2} style={{ textAlign: "center", color: "#6b7280", padding: 20 }}>
-                  Nenhuma solicitação registrada.
+                  Nenhuma solicitaÃ§Ã£o registrada.
                 </td>
               </tr>
             )}
@@ -404,11 +419,11 @@ function RelatoriosPageContent() {
         </table>
       </div>
 
-      {/* Serviços Realizados por Equipe */}
+      {/* ServiÃ§os Realizados por Equipe */}
       <div className="card" style={{ marginBottom: 24 }}>
-        <h2 style={{ fontSize: 18, marginBottom: 4, color: "#003882" }}>✅ Serviços Realizados por Equipe</h2>
+        <h2 style={{ fontSize: 18, marginBottom: 4, color: "#003882" }}>âœ… ServiÃ§os Realizados por Equipe</h2>
         <p style={{ fontSize: 12, color: "#6b7280", marginBottom: 12 }}>
-          Lista de todos os serviços concluídos, agrupados por equipe, com data e técnico responsável.
+          Lista de todos os serviÃ§os concluÃ­dos, agrupados por equipe, com data e tÃ©cnico responsÃ¡vel.
         </p>
 
         {relatorio.porEquipeComData.map((grupo) => (
@@ -417,24 +432,25 @@ function RelatoriosPageContent() {
               background: "#003882", color: "#fff", padding: "10px 14px",
               display: "flex", justifyContent: "space-between", alignItems: "center"
             }}>
-              <strong style={{ fontSize: 14 }}>👥 {grupo.equipe}</strong>
+              <strong style={{ fontSize: 14 }}>ðŸ‘¥ {grupo.equipe}</strong>
               <span style={{ fontSize: 12, background: "rgba(255,255,255,0.2)", padding: "2px 8px", borderRadius: 10 }}>
-                {grupo.servicos.length} serviços
+                {grupo.servicos.length} serviÃ§os
               </span>
             </div>
             {grupo.servicos.length === 0 ? (
               <div style={{ padding: 16, textAlign: "center", color: "#6b7280", fontSize: 13 }}>
-                Nenhum serviço concluído por esta equipe ainda.
+                Nenhum serviÃ§o concluÃ­do por esta equipe ainda.
               </div>
             ) : (
               <table style={{ margin: 0 }}>
                 <thead>
                   <tr>
                     <th style={{ width: 100 }}>Data</th>
-                    <th>Serviço</th>
+                    <th>ServiÃ§o</th>
                     <th>Local</th>
-                    <th>Técnico</th>
-                    <th style={{ width: 80 }}>Duração</th>
+                    <th>Solicitante</th>
+                    <th>TÃ©cnico</th>
+                    <th style={{ width: 80 }}>DuraÃ§Ã£o</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -443,8 +459,9 @@ function RelatoriosPageContent() {
                       <td style={{ whiteSpace: "nowrap", fontFamily: "monospace", fontSize: 13 }}>{s.data}</td>
                       <td>{s.titulo}</td>
                       <td style={{ fontSize: 13 }}>{s.local}</td>
+                      <td style={{ fontSize: 13 }}>{s.solicitante}</td>
                       <td style={{ fontSize: 13 }}>{s.tecnico}</td>
-                      <td style={{ fontSize: 13 }}>{s.duracao > 0 ? `${s.duracao} min` : "—"}</td>
+                      <td style={{ fontSize: 13 }}>{s.duracao > 0 ? `${s.duracao} min` : "â€”"}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -455,7 +472,7 @@ function RelatoriosPageContent() {
 
         {relatorio.porEquipeComData.every((g) => g.servicos.length === 0) && (
           <div style={{ textAlign: "center", color: "#6b7280", padding: 20 }}>
-            Nenhum serviço concluído ainda.
+            Nenhum serviÃ§o concluÃ­do ainda.
           </div>
         )}
       </div>
