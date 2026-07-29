@@ -784,7 +784,8 @@ export const deleteTecnicoPublic = mutation({
   handler: async (ctx, args) => {
     const tec = await ctx.db.get(args.id);
     if (!tec) return { ok: false, error: "Tecnico nao encontrado" };
-    const servicos = await ctx.db.query("servicos").withIndex("by_tecnico", (q: any) => q.eq("tecnicoId", args.id)).collect();
+    const allServicos = await ctx.db.query("servicos").collect();
+    const servicos = allServicos.filter((sv: any) => sv.tecnicoId === args.id);
     if (servicos.length > 0) {
       return { ok: false, error: "Tecnico tem " + servicos.length + " servicos vinculados." };
     }
