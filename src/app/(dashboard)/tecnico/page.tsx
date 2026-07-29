@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "../../../../convex/_generated/api";
 import { useState } from "react";
@@ -96,6 +96,8 @@ function TecnicoPageContent() {
         solicitanteSecao: cr.solicitanteSecao,
         dataInicioExec: cr.dataInicioExec || undefined,
         dataFimExec: cr.dataFimExec || undefined,
+        equipeId: ((cr as any).equipeId) || undefined,
+        tecnicoId: ((cr as any).tecnicoId) || undefined,
       });
       setShowCadastroRapido(false);
       setCr({ titulo: "", descricao: "", local: "", urgencia: "media",

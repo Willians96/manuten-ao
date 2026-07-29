@@ -669,7 +669,21 @@ export const criarServicoAdminPublic = mutation({
       throw new Error("Apenas Admin Master pode usar");
     }
 
-    const status = args.dataFimExec ? "concluido" : "em_andamento";
+    // Normaliza datas
+    const parseDataA = (s: any): string | undefined => {
+      if (!s) return undefined;
+      const d = new Date(s);
+      return isNaN(d.getTime()) ? undefined : s;
+    };
+    const dataInicioNorm = parseDataA(args.dataInicioExec);
+    const dataFimNorm = parseDataA(args.dataFimExec);
+    // Modalidade baseada na equipe
+    let modalidade: "servicos_gerais" | "informatica" = "servicos_gerais";
+    const equipeEscolhida = await ctx.db.get(args.equipeId);
+    if (equipeEscolhida && (equipeEscolhida as any).modalidade === "informatica") {
+      modalidade = "informatica";
+    }
+    const status = dataFimNorm ? "concluido" : "em_andamento";
     const servicoId = await ctx.db.insert("servicos", {
       solicitanteId: args.criadoPorUserId,
       titulo: args.titulo,
@@ -687,8 +701,9 @@ export const criarServicoAdminPublic = mutation({
         re: args.solicitanteRe,
         secao: args.solicitanteSecao,
       },
-      dataInicioExec: args.dataInicioExec,
-      dataFimExec: args.dataFimExec,
+      dataInicioExec: dataInicioNorm,
+      dataFimExec: dataFimNorm,
+      modalidade: modalidade,
       createdAt: Date.now(),
       updatedAt: Date.now(),
     });
@@ -700,7 +715,7 @@ export const criarServicoAdminPublic = mutation({
         tecnicoId: args.tecnicoId,
         acao: "inicio",
         observacao: `Cadastro retroativo â€” inÃ­cio: ${args.dataInicioExec}`,
-        createdAt: new Date(args.dataInicioExec).getTime(),
+        createdAt: dataInicioNorm ? new Date(dataInicioNorm).getTime() : Date.now(),
       });
     }
     // Log de fim (se tiver dataFimExec)
@@ -710,7 +725,7 @@ export const criarServicoAdminPublic = mutation({
         tecnicoId: args.tecnicoId,
         acao: "fim",
         observacao: `Cadastro retroativo â€” fim: ${args.dataFimExec}`,
-        createdAt: new Date(args.dataFimExec).getTime(),
+        createdAt: dataFimNorm ? new Date(dataFimNorm).getTime() : Date.now(),
       });
     }
 
@@ -752,6 +767,14 @@ export const listAllTecnicosPublic = query({
 export const listAllServicosPublic = query({
   args: {},
   handler: async (ctx) => ctx.db.query("servicos").collect(),
+});
+
+export const findServicoByTituloPublic = query({
+  args: { titulo: v.string() },
+  handler: async (ctx, args) => {
+    const all = await ctx.db.query("servicos").collect();
+    return all.filter((s: any) => (s.titulo || "").toLowerCase().includes(args.titulo.toLowerCase()));
+  },
 });
 
 export const findServicoByIdPublic = query({
@@ -1148,7 +1171,7 @@ export const pausarServico = mutation({
       .withIndex("by_clerkId", (q) => q.eq("clerkId", userId))
       .first();
 
-    if (!user || user.role !== "tecnico") throw new Error("NÃ£o autorizado");
+    if (!user || (user.role !== "tecnico" && user.role !== "admin")) throw new Error("NÃ£o autorizado");
 
     const tecnico = await ctx.db
       .query("tecnicos")
@@ -1190,7 +1213,7 @@ export const retomarServico = mutation({
       .withIndex("by_clerkId", (q) => q.eq("clerkId", userId))
       .first();
 
-    if (!user || user.role !== "tecnico") throw new Error("NÃ£o autorizado");
+    if (!user || (user.role !== "tecnico" && user.role !== "admin")) throw new Error("NÃ£o autorizado");
 
     const tecnico = await ctx.db
       .query("tecnicos")
@@ -1244,7 +1267,7 @@ export const iniciarServico = mutation({
       .withIndex("by_clerkId", (q) => q.eq("clerkId", userId))
       .first();
 
-    if (!user || user.role !== "tecnico") throw new Error("NÃ£o autorizado");
+    if (!user || (user.role !== "tecnico" && user.role !== "admin")) throw new Error("NÃ£o autorizado");
 
     const tecnico = await ctx.db
       .query("tecnicos")
@@ -1291,7 +1314,7 @@ export const encerrarServico = mutation({
       .withIndex("by_clerkId", (q) => q.eq("clerkId", userId))
       .first();
 
-    if (!user || user.role !== "tecnico") throw new Error("NÃ£o autorizado");
+    if (!user || (user.role !== "tecnico" && user.role !== "admin")) throw new Error("NÃ£o autorizado");
 
     const tecnico = await ctx.db
       .query("tecnicos")
@@ -1434,6 +1457,27 @@ export const criarServicoDireto = mutation({
 
     // Se forneceu dataFim â†’ jÃ¡ nasce concluÃ­do
     const status = args.dataFimExec ? "concluido" : "em_andamento";
+
+    // Normaliza datas: se vier vazia ou invÃ¡lida, usa undefined
+    const parseData = (s: any): string | undefined => {
+      if (!s) return undefined;
+      const d = new Date(s);
+      return isNaN(d.getTime()) ? undefined : s;
+    };
+    const dataInicioNorm = parseData(args.dataInicioExec);
+    const dataFimNorm = parseData(args.dataFimExec);
+
+    // Determina modalidade: SG (servicos_gerais) ou TI (informatica)
+    // baseado na equipe escolhida
+    let modalidade: "servicos_gerais" | "informatica" = "servicos_gerais";
+    if (equipeIdFinal) {
+      const equipeEscolhida = await ctx.db.get(equipeIdFinal);
+      if (equipeEscolhida && (equipeEscolhida as any).modalidade === "informatica") {
+        modalidade = "informatica";
+      }
+    }
+    // Se admin passou modalidade no args, usa ela
+    if (args.modalidade) modalidade = args.modalidade;
 
     const servicoId = await ctx.db.insert("servicos", {
       solicitanteId: user._id,

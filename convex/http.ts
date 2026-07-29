@@ -388,14 +388,41 @@ const runMigration = httpAction(async (ctx, request) => {
   if (name === "reatribuirSolicitante") {
     // Reatribui o solicitante de um servico para o user de um RE especifico
     // Usado quando o servico foi cadastrado em nome de outra pessoa (cadastroDireto)
-    // Args: { servicoId, solicitanteRe }
-    if (!migArgs || !migArgs.servicoId || !migArgs.solicitanteRe) {
-      return new Response(JSON.stringify({ error: "servicoId e solicitanteRe sao obrigatorios" }), {
+    // Args: { servicoId? OU titulo, solicitanteRe }
+    if (!migArgs || !migArgs.solicitanteRe) {
+      return new Response(JSON.stringify({ error: "solicitanteRe e obrigatorio (use servicoId OU titulo)" }), {
         status: 400,
         headers: { "Content-Type": "application/json" },
       });
     }
-    const servico = await ctx.runQuery(api.mutations.findServicoByIdPublic, { id: migArgs.servicoId });
+    if (!migArgs.servicoId && !migArgs.titulo) {
+      return new Response(JSON.stringify({ error: "informe servicoId OU titulo" }), {
+        status: 400,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+    let servico;
+    if (migArgs.servicoId) {
+      servico = await ctx.runQuery(api.mutations.findServicoByIdPublic, { id: migArgs.servicoId });
+    } else {
+      const matches = await ctx.runQuery(api.mutations.findServicoByTituloPublic, { titulo: migArgs.titulo });
+      if (matches.length === 0) {
+        return new Response(JSON.stringify({ error: "Nenhum servico encontrado com esse titulo" }), {
+          status: 404,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+      if (matches.length > 1) {
+        return new Response(JSON.stringify({
+          error: "Multiplos servicos encontrados, use servicoId",
+          matches: matches.map((m: any) => ({ _id: m._id, titulo: m.titulo, data: m._creationTime })),
+        }), {
+          status: 409,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+      servico = matches[0];
+    }
     if (!servico) {
       return new Response(JSON.stringify({ error: "Servico nao encontrado" }), {
         status: 404,
@@ -410,12 +437,13 @@ const runMigration = httpAction(async (ctx, request) => {
       });
     }
     await ctx.runMutation(api.mutations.patchServicoSolicitanteIdPublic, {
-      id: migArgs.servicoId,
+      id: servico._id,
       solicitanteId: novoSolicitante._id,
     });
     return new Response(JSON.stringify({
       ok: true,
-      servicoId: migArgs.servicoId,
+      servicoId: servico._id,
+      servicoTitulo: servico.titulo,
       novoSolicitanteId: novoSolicitante._id,
       novoSolicitanteNome: novoSolicitante.nomeDeGuerra || novoSolicitante.name,
       novoSolicitanteGraduacao: novoSolicitante.graduacao,
