@@ -24,6 +24,18 @@ function RelatoriosPageContent() {
   const usuarios = useQuery(api.mutations.listAllUsers, {});
 
   // CÃ¡lculos adicionais
+  // Helper: pega o nome do solicitante do serviÃ§o (user real OU dadosSolicitante)
+  const solicitanteNome = (s: any): string => {
+    if (s.solicitanteId) {
+      const u = (usuarios ?? []).find((x: any) => x._id === s.solicitanteId);
+      if (u) return `${u.graduacao ?? ""} ${u.nomeDeGuerra ?? u.name ?? ""}`.trim();
+    }
+    if (s.dadosSolicitante) {
+      return `${s.dadosSolicitante.graduacao ?? ""} ${s.dadosSolicitante.nome ?? ""}`.trim();
+    }
+    return "â€”";
+  };
+
   const relatorio = useMemo(() => {
     if (!servicos || !equipes || !tecnicos || !stats) return null;
 
