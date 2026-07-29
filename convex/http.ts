@@ -506,7 +506,7 @@ const runMigration = httpAction(async (ctx, request) => {
       if (u.dataInicioExec !== undefined) patch.dataInicioExec = u.dataInicioExec;
       if (u.dataFimExec !== undefined) patch.dataFimExec = u.dataFimExec;
       if (u.status) patch.status = u.status;
-      await ctx.db.patch(u.servicoId, patch);
+      await ctx.runMutation(api.mutations.patchServicoCamposPublic, { id: u.servicoId, ...patch });
       resultados.push({ ok: true, servicoId: u.servicoId, titulo: servico.titulo, patch });
     }
     return new Response(JSON.stringify({

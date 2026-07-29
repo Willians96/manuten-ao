@@ -807,6 +807,24 @@ export const findServicoByIdPublic = query({
   handler: async (ctx, args) => ctx.db.get(args.id),
 });
 
+// Patch generico de campos do servico (usado pra migrations via httpAction)
+export const patchServicoCamposPublic = mutation({
+  args: {
+    id: v.id("servicos"),
+    dataInicioExec: v.optional(v.string()),
+    dataFimExec: v.optional(v.string()),
+    status: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const patch: any = { updatedAt: Date.now() };
+    if (args.dataInicioExec !== undefined) patch.dataInicioExec = args.dataInicioExec;
+    if (args.dataFimExec !== undefined) patch.dataFimExec = args.dataFimExec;
+    if (args.status !== undefined) patch.status = args.status;
+    await ctx.db.patch(args.id, patch);
+    return { ok: true, id: args.id, patch };
+  },
+});
+
 export const patchServicoSolicitanteIdPublic = mutation({
   args: { id: v.id("servicos"), solicitanteId: v.id("users") },
   handler: async (ctx, args) => {
