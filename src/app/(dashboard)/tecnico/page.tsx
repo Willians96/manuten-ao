@@ -26,9 +26,12 @@ function TecnicoPageContent() {
   const criarDireto = useMutation(api.mutations.criarServicoDireto);
 
   // Acha o tecnico atual (vinculado ao user logado)
-  const tecnico = (tecnicos ?? []).find((t: any) =>
-    me && (t as any).user?.clerkId === (me as any).clerkId
-  );
+  // Pega o tecnico ATIVO do user (ignora inativos/orfaos herdados)
+  // Prioridade: 1) ativo=true + modalidades inclui "informatica" (TI), 2) ativo=true, 3) qualquer um
+  const tecnicoUser = (tecnicos ?? []).filter((t: any) => me && (t as any).user?.clerkId === (me as any).clerkId);
+  const tecnicoAtivoTI = tecnicoUser.find((t: any) => t.ativo !== false && (t.modalidades || []).includes("informatica"));
+  const tecnicoAtivo = tecnicoAtivoTI || tecnicoUser.find((t: any) => t.ativo !== false);
+  const tecnico = tecnicoAtivo || tecnicoUser[0];
 
   const [encerrarObs, setEncerrarObs] = useState<string | null>(null);
   const [pausarServ, setPausarServ] = useState<string | null>(null);
