@@ -1,4 +1,4 @@
-import { httpRouter } from "convex/server";
+﻿import { httpRouter } from "convex/server";
 import { httpAction } from "./_generated/server";
 import { api } from "./_generated/api";
 
@@ -384,7 +384,51 @@ const runMigration = httpAction(async (ctx, request) => {
     });
   }
 
-  return new Response(JSON.stringify({ error: `migration '${name}' not found` }), {
+
+  if (name === "reatribuirSolicitante") {
+    // Reatribui o solicitante de um servico para o user de um RE especifico
+    // Usado quando o servico foi cadastrado em nome de outra pessoa (cadastroDireto)
+    // Args: { servicoId, solicitanteRe }
+    if (!migArgs || !migArgs.servicoId || !migArgs.solicitanteRe) {
+      return new Response(JSON.stringify({ error: "servicoId e solicitanteRe sao obrigatorios" }), {
+        status: 400,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+    const servico = await ctx.runQuery(api.mutations.findServicoByIdPublic, { id: migArgs.servicoId });
+    if (!servico) {
+      return new Response(JSON.stringify({ error: "Servico nao encontrado" }), {
+        status: 404,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+    const novoSolicitante = await ctx.runQuery(api.mutations.findUserByRePublicSafe, { re: migArgs.solicitanteRe });
+    if (!novoSolicitante) {
+      return new Response(JSON.stringify({ error: "User com RE " + migArgs.solicitanteRe + " nao encontrado" }), {
+        status: 404,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+    await ctx.runMutation(api.mutations.patchServicoSolicitanteIdPublic, {
+      id: migArgs.servicoId,
+      solicitanteId: novoSolicitante._id,
+    });
+    return new Response(JSON.stringify({
+      ok: true,
+      servicoId: migArgs.servicoId,
+      novoSolicitanteId: novoSolicitante._id,
+      novoSolicitanteNome: novoSolicitante.nomeDeGuerra || novoSolicitante.name,
+      novoSolicitanteGraduacao: novoSolicitante.graduacao,
+      novoSolicitanteRe: novoSolicitante.re,
+      antigoSolicitanteId: servico.solicitanteId,
+      dadosSolicitanteAnterior: servico.dadosSolicitante,
+    }), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+
+    return new Response(JSON.stringify({ error: `migration '${name}' not found` }), {
     status: 404,
     headers: { "Content-Type": "application/json" },
   });

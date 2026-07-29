@@ -754,6 +754,19 @@ export const listAllServicosPublic = query({
   handler: async (ctx) => ctx.db.query("servicos").collect(),
 });
 
+export const findServicoByIdPublic = query({
+  args: { id: v.id("servicos") },
+  handler: async (ctx, args) => ctx.db.get(args.id),
+});
+
+export const patchServicoSolicitanteIdPublic = mutation({
+  args: { id: v.id("servicos"), solicitanteId: v.id("users") },
+  handler: async (ctx, args) => {
+    await ctx.db.patch(args.id, { solicitanteId: args.solicitanteId });
+    return { ok: true };
+  },
+});
+
 export const findTecnicoByReAndEquipePublic = query({
   args: { re: v.string() },
   handler: async (ctx, args) => {
