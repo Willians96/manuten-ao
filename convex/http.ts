@@ -523,33 +523,6 @@ const runMigration = httpAction(async (ctx, request) => {
   }
 
 
-// Helper public: lista serviceLogs de um servico
-export const listServiceLogsByServicoPublic = query({
-  args: { servicoId: v.id("servicos") },
-  handler: async (ctx, args) => {
-    const all = await ctx.db.query("serviceLogs").collect();
-    return all.filter((l: any) => l.servicoId === args.servicoId).sort((a: any, b: any) => a.createdAt - b.createdAt);
-  },
-});
-
-// Helper public: lista servicos concluidos sem dataFimExec
-export const listServicosSemDataFimPublic = query({
-  args: {},
-  handler: async (ctx) => {
-    const all = await ctx.db.query("servicos").collect();
-    return all.filter((s: any) => s.status === "concluido" && !s.dataFimExec);
-  },
-});
-
-// Helper public: lista servicos em_andamento sem dataInicioExec
-export const listServicosSemDataInicioPublic = query({
-  args: {},
-  handler: async (ctx) => {
-    const all = await ctx.db.query("servicos").collect();
-    return all.filter((s: any) => s.status === "em_andamento" && !s.dataInicioExec);
-  },
-});
-
     if (name === "inferirDatasDosLogs") {
     // Para servicos concluidos sem dataFimExec OU em_andamento sem dataInicioExec,
     // infere as datas dos serviceLogs (acao=inicio -> dataInicioExec, acao=fim -> dataFimExec)

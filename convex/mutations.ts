@@ -794,6 +794,33 @@ export const deleteTecnicoPublic = mutation({
   },
 });
 
+// Helper: lista serviceLogs de um servico
+export const listServiceLogsByServicoPublic = query({
+  args: { servicoId: v.id("servicos") },
+  handler: async (ctx, args) => {
+    const all = await ctx.db.query("serviceLogs").collect();
+    return all.filter((l: any) => l.servicoId === args.servicoId).sort((a: any, b: any) => a.createdAt - b.createdAt);
+  },
+});
+
+// Helper: lista servicos concluidos sem dataFimExec
+export const listServicosSemDataFimPublic = query({
+  args: {},
+  handler: async (ctx) => {
+    const all = await ctx.db.query("servicos").collect();
+    return all.filter((s: any) => s.status === "concluido" && !s.dataFimExec);
+  },
+});
+
+// Helper: lista servicos em_andamento sem dataInicioExec
+export const listServicosSemDataInicioPublic = query({
+  args: {},
+  handler: async (ctx) => {
+    const all = await ctx.db.query("servicos").collect();
+    return all.filter((s: any) => s.status === "em_andamento" && !s.dataInicioExec);
+  },
+});
+
 export const findServicoByTituloPublic = query({
   args: { titulo: v.string() },
   handler: async (ctx, args) => {
