@@ -3,6 +3,7 @@ import { useQuery, useMutation } from "convex/react";
 import { api } from "../../../../convex/_generated/api";
 import { useState } from "react";
 import { RoleGuard } from "../../../components/RoleGuard";
+import { ehChamadoExtra } from "../../../lib/extra";
 
 export const dynamic = "force-dynamic";
 
@@ -24,6 +25,8 @@ function TecnicoPageContent() {
   const pausar = useMutation(api.mutations.pausarServico);
   const retomar = useMutation(api.mutations.retomarServico);
   const criarDireto = useMutation(api.mutations.criarServicoDireto);
+  const feriados = useQuery(api.mutations.listFeriados, {}) ?? [];
+  const setStatus = useMutation(api.mutations.setMeuStatusTecnico);
 
   // Acha o tecnico atual (vinculado ao user logado)
   // Pega o tecnico ATIVO do user (ignora inativos/orfaos herdados)
@@ -37,6 +40,14 @@ function TecnicoPageContent() {
   const [pausarServ, setPausarServ] = useState<string | null>(null);
   const [motivoPausa, setMotivoPausa] = useState("");
   const [showCadastroRapido, setShowCadastroRapido] = useState(false);
+  const [showFolgaModal, setShowFolgaModal] = useState(false);
+  const [motivoFolga, setMotivoFolga] = useState<"ferias"|"baixa">("baixa");
+  const [obsFolga, setObsFolga] = useState("");
+
+  // Verifica se o tecnico esta em folga HOJE
+  const emFolgaHoje = tecnico && tecnico.status && tecnico.status !== "ativo" && tecnico.statusDesde
+    ? new Date(tecnico.statusDesde).toISOString().slice(0, 10) === new Date().toISOString().slice(0, 10)
+    : false;
 
   const [cr, setCr] = useState({
     titulo: "", descricao: "", local: "", urgencia: "media",
@@ -110,17 +121,93 @@ function TecnicoPageContent() {
     } catch (e: any) { alert(e.message); }
   }
 
+  async function handleSetFolga() {
+    try {
+      if (emFolgaHoje) {
+        // Desativar
+        await setStatus({ status: "ativo" });
+      } else {
+        // Ativar
+        await setStatus({ status: motivoFolga, observacao: obsFolga || undefined });
+      }
+      setShowFolgaModal(false);
+      setObsFolga("");
+    } catch (e: any) { alert(e.message); }
+  }
+
   const set = (field: string) => (e: any) =>
     setCr((prev) => ({ ...prev, [field]: e.target.value }));
 
   return (
     <div className="page-container">
+      {/* Banner de folga */}
+      {emFolgaHoje && (
+        <div style={{
+          background: "#fef3c7", border: "2px solid #f59e0b", color: "#92400e",
+          padding: "12px 16px", borderRadius: 8, marginBottom: 16,
+          display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap",
+        }}>
+          <div>
+            <strong>🌴 Você está de {tecnico?.status === "ferias" ? "férias" : "baixa"} hoje.</strong>{" "}
+            Qualquer serviço que você atender agora será marcado como <strong>"Acionado emergencialmente na folga"</strong> nos relatórios.
+          </div>
+          <button className="btn btn-outline" style={{ fontSize: 13, padding: "6px 12px" }} onClick={() => setShowFolgaModal(true)}>
+            Desativar
+          </button>
+        </div>
+      )}
+
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20, gap: 20, flexWrap: "wrap" }}>
         <h1 className="page-title" style={{ margin: 0 }}>🔧 Painel do Técnico</h1>
-        <button className="btn btn-primary" onClick={() => setShowCadastroRapido(!showCadastroRapido)} style={{ whiteSpace: "nowrap" }}>
-          {showCadastroRapido ? "✖ Fechar" : "⚡ Cadastro Rápido"}
-        </button>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          {!emFolgaHoje && (
+            <button className="btn btn-outline" onClick={() => setShowFolgaModal(true)} style={{ whiteSpace: "nowrap", borderColor: "#f59e0b", color: "#92400e" }}>
+              🌴 Estou de folga hoje
+            </button>
+          )}
+          <button className="btn btn-primary" onClick={() => setShowCadastroRapido(!showCadastroRapido)} style={{ whiteSpace: "nowrap" }}>
+            {showCadastroRapido ? "✖ Fechar" : "⚡ Cadastro Rápido"}
+          </button>
+        </div>
       </div>
+
+      {/* Modal Ativar/Desativar Folga */}
+      {showFolgaModal && (
+        <Modal title={emFolgaHoje ? "Desativar folga?" : "🌴 Ativar folga hoje"} onClose={() => setShowFolgaModal(false)}>
+          {emFolgaHoje ? (
+            <div>
+              <p style={{ marginBottom: 16, fontSize: 14 }}>
+                Tem certeza que deseja desativar? Seu status voltará a <strong>ativo</strong> e novos serviços não serão mais marcados como folga.
+              </p>
+              <div style={{ display: "flex", gap: 8 }}>
+                <button className="btn btn-primary" onClick={handleSetFolga}>Sim, desativar</button>
+                <button className="btn btn-outline" onClick={() => setShowFolgaModal(false)}>Cancelar</button>
+              </div>
+            </div>
+          ) : (
+            <div>
+              <p style={{ marginBottom: 12, fontSize: 13, color: "#6b7280" }}>
+                Selecione o motivo. Vale só para hoje — amanhã seu status volta automaticamente para "ativo".
+              </p>
+              <div className="form-group" style={{ marginBottom: 12 }}>
+                <label>Motivo *</label>
+                <select value={motivoFolga} onChange={(e) => setMotivoFolga(e.target.value as any)} style={{ fontSize: 16, padding: "12px 14px" }}>
+                  <option value="baixa">Baixa médica</option>
+                  <option value="ferias">Férias</option>
+                </select>
+              </div>
+              <div className="form-group" style={{ marginBottom: 16 }}>
+                <label>Observação (opcional)</label>
+                <textarea rows={2} value={obsFolga} onChange={(e) => setObsFolga(e.target.value)} placeholder="Ex: consulta médica agendada, viagem, etc" style={{ fontSize: 16, padding: "12px 14px" }} />
+              </div>
+              <div style={{ display: "flex", gap: 8 }}>
+                <button className="btn btn-primary" onClick={handleSetFolga} style={{ background: "#f59e0b", borderColor: "#f59e0b" }}>Ativar folga</button>
+                <button className="btn btn-outline" onClick={() => setShowFolgaModal(false)}>Cancelar</button>
+              </div>
+            </div>
+          )}
+        </Modal>
+      )}
 
       {/* ── Cadastro Rápido ─────────────────────────────────────────────── */}
       {showCadastroRapido && (
@@ -258,10 +345,16 @@ function TecnicoPageContent() {
           {pausados.map((s: any) => {
             const eqOrigem = (equipes ?? []).find((e: any) => e._id === s.equipeId);
             const deOutraEquipe = tecnico && s.equipeId !== tecnico.equipeId;
-            return (
+            const extraP = ehChamadoExtra({ servico: s, tecnico, equipe: (equipes ?? []).find((e: any) => e._id === s.equipeId), feriados: feriados.map((f: any) => f.data) });
+          return (
               <div key={s._id} className="card" style={{ borderLeft: `4px solid ${deOutraEquipe ? "#003882" : "#c2410c"}`, background: "#fff7ed" }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12 }}>
                   <div style={{ flex: 1 }}>
+                    {extraP.isExtra && (
+                      <div style={{ fontSize: 11, background: "#fed7aa", color: "#9a3412", padding: "3px 8px", borderRadius: 4, display: "inline-block", marginBottom: 6, fontWeight: 700 }} title={extraP.motivo}>
+                        ⚠️ {extraP.label}
+                      </div>
+                    )}
                     <div style={{ fontWeight: 600, fontSize: 15 }}>{s.titulo}</div>
                     {s.cadastroDireto && s.dadosSolicitante && (
                       <div style={{ fontSize: 12, background: "#eff6ff", padding: "2px 8px", borderRadius: 4, display: "inline-block", marginTop: 4 }}>
@@ -321,6 +414,9 @@ function TecnicoPageContent() {
               onEncerrar={(id: any) => setEncerrarObs(id)}
               onPausar={(id: any) => setPausarServ(id)}
               showPausar
+              tecnico={tecnico}
+              equipes={equipes}
+              feriados={feriados}
             />
           ))}
           {emAndamento.length === 0 && (
@@ -343,7 +439,7 @@ function TecnicoPageContent() {
                 🎯 Atribuídos a mim ({aguardandoMeus.length})
               </div>
               {aguardandoMeus.map((s: any) => (
-                <ServicoCard key={s._id} servico={s} onIniciar={handleIniciar} />
+                <ServicoCard key={s._id} servico={s} onIniciar={handleIniciar} tecnico={tecnico} equipes={equipes} feriados={feriados} />
               ))}
             </>
           )}
@@ -355,7 +451,7 @@ function TecnicoPageContent() {
                 🤝 Disponíveis na equipe ({aguardandoEquipe.length}) — qualquer um pode pegar
               </div>
               {aguardandoEquipe.map((s: any) => (
-                <ServicoCard key={s._id} servico={s} onIniciar={handleIniciar} />
+                <ServicoCard key={s._id} servico={s} onIniciar={handleIniciar} tecnico={tecnico} equipes={equipes} feriados={feriados} />
               ))}
             </>
           )}
@@ -371,7 +467,7 @@ function TecnicoPageContent() {
                 👥 Atribuídos a outros da equipe ({aguardandoOutros.length}) — você não pode pegar
               </div>
               {aguardandoOutros.map((s: any) => (
-                <ServicoCard key={s._id} servico={s} onIniciar={handleIniciar} />
+                <ServicoCard key={s._id} servico={s} onIniciar={handleIniciar} tecnico={tecnico} equipes={equipes} feriados={feriados} />
               ))}
             </>
           )}
@@ -422,12 +518,19 @@ function TecnicoPageContent() {
 }
 
 // ── Card genérico ─────────────────────────────────────────────────────────
-function ServicoCard({ servico: s, onIniciar, onEncerrar, onPausar, showPausar }: any) {
+function ServicoCard({ servico: s, onIniciar, onEncerrar, onPausar, showPausar, tecnico, equipes, feriados }: any) {
   const borderColor = s.status === "em_andamento" ? "#e30613" : "#1e40af";
+  const equipeServ = (equipes ?? []).find((e: any) => e._id === s.equipeId);
+  const extraInfo = ehChamadoExtra({ servico: s, tecnico, equipe: equipeServ, feriados: (feriados ?? []).map((f: any) => f.data) });
   return (
     <div className="card" style={{ borderLeft: `4px solid ${borderColor}` }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12 }}>
         <div style={{ flex: 1 }}>
+          {extraInfo.isExtra && (
+            <div style={{ fontSize: 11, background: "#fed7aa", color: "#9a3412", padding: "3px 8px", borderRadius: 4, display: "inline-block", marginBottom: 6, fontWeight: 700 }} title={extraInfo.motivo}>
+              ⚠️ {extraInfo.label}
+            </div>
+          )}
           <div style={{ fontWeight: 600, fontSize: 15 }}>{s.titulo}</div>
           {s.cadastroDireto && s.dadosSolicitante && (
             <div style={{ fontSize: 12, background: "#eff6ff", padding: "2px 8px", borderRadius: 4, display: "inline-block", marginTop: 4 }}>
