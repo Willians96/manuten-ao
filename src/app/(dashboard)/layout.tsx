@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { SignedIn, SignOutButton, useUser } from "@clerk/nextjs";
@@ -45,6 +45,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     { href: "/gestor/relatorios", label: "Relatórios", icon: "📈", roles: ["gestor", "admin"] },
     { href: "/gestor/aprovar", label: "Aprovar Usuários", icon: "👥", roles: ["gestor", "admin"] },
     { href: "/gestor/equipes", label: "Equipes", icon: "🔧", roles: ["gestor", "admin"] },
+  { href: "/gestor/feriados", label: "Feriados", icon: "📅", roles: ["gestor", "admin"] },
     // Admin Master também pode acessar painel técnico e solicitar (filtro dinâmico pelo role)
     { href: "/tecnico", label: "Painel Técnico", icon: "🔧", roles: ["tecnico", "admin"] },
     { href: "/solicitar", label: "Solicitar / Minhas", icon: "📝", roles: ["solicitante", "gestor", "admin"] },

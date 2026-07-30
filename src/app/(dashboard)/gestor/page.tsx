@@ -1,9 +1,10 @@
-"use client";
+﻿"use client";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "../../../../convex/_generated/api";
 import { useState } from "react";
 import Link from "next/link";
 import { RoleGuard } from "../../../components/RoleGuard";
+import { ehChamadoExtra } from "../../../lib/extra";
 
 export const dynamic = "force-dynamic";
 
@@ -20,6 +21,7 @@ function GestorPageContent() {
   const servicos = useQuery(api.mutations.listServicos, {});
   const equipes = useQuery(api.mutations.listEquipes, {});
   const tecnicos = useQuery(api.mutations.listTecnicos, {});
+  const feriados = useQuery(api.mutations.listFeriados, {}) ?? [];
   const me = useQuery(api.mutations.me);
   const atribuir = useMutation(api.mutations.atribuirServico);
   const excluir = useMutation(api.mutations.excluirServico);
@@ -27,6 +29,24 @@ function GestorPageContent() {
   const editar = useMutation(api.mutations.editarServico);
 
   const isAdminMaster = me?.isAdminMaster === true;
+
+  // Extras este mes (chamados fora do expediente/horario do tecnico)
+  const extrasMesAtual = (() => {
+    if (!servicos) return 0;
+    const agora = new Date();
+    const inicioMes = new Date(agora.getFullYear(), agora.getMonth(), 1).getTime();
+    const fimMes = new Date(agora.getFullYear(), agora.getMonth() + 1, 1).getTime();
+    const feriadosDatas = feriados.map((f: any) => f.data);
+    return servicos.filter((s: any) => {
+      if (s.status !== "concluido" && s.status !== "em_andamento") return false;
+      if (!s.dataInicioExec) return false;
+      const t = new Date(s.dataInicioExec).getTime();
+      if (t < inicioMes || t >= fimMes) return false;
+      const tec = (tecnicos ?? []).find((tc: any) => tc._id === s.tecnicoId);
+      const eq = (equipes ?? []).find((e: any) => e._id === s.equipeId);
+      return ehChamadoExtra({ servico: s, tecnico: tec, equipe: eq, feriados: feriadosDatas }).isExtra;
+    }).length;
+  })();
 
   const [filtro, setFiltro] = useState("todos");
   const [editS, setEditS] = useState<any>(null);
