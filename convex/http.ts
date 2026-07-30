@@ -522,6 +522,82 @@ const runMigration = httpAction(async (ctx, request) => {
     });
   }
 
+
+// Helper public: lista serviceLogs de um servico
+export const listServiceLogsByServicoPublic = query({
+  args: { servicoId: v.id("servicos") },
+  handler: async (ctx, args) => {
+    const all = await ctx.db.query("serviceLogs").collect();
+    return all.filter((l: any) => l.servicoId === args.servicoId).sort((a: any, b: any) => a.createdAt - b.createdAt);
+  },
+});
+
+// Helper public: lista servicos concluidos sem dataFimExec
+export const listServicosSemDataFimPublic = query({
+  args: {},
+  handler: async (ctx) => {
+    const all = await ctx.db.query("servicos").collect();
+    return all.filter((s: any) => s.status === "concluido" && !s.dataFimExec);
+  },
+});
+
+// Helper public: lista servicos em_andamento sem dataInicioExec
+export const listServicosSemDataInicioPublic = query({
+  args: {},
+  handler: async (ctx) => {
+    const all = await ctx.db.query("servicos").collect();
+    return all.filter((s: any) => s.status === "em_andamento" && !s.dataInicioExec);
+  },
+});
+
+    if (name === "inferirDatasDosLogs") {
+    // Para servicos concluidos sem dataFimExec OU em_andamento sem dataInicioExec,
+    // infere as datas dos serviceLogs (acao=inicio -> dataInicioExec, acao=fim -> dataFimExec)
+    const semFim = await ctx.runQuery(api.mutations.listServicosSemDataFimPublic, {});
+    const semInicio = await ctx.runQuery(api.mutations.listServicosSemDataInicioPublic, {});
+    const alvos = [...semFim, ...semInicio];
+    const resultados: any[] = [];
+    for (const serv of alvos) {
+      const logs = await ctx.runQuery(api.mutations.listServiceLogsByServicoPublic, { servicoId: serv._id });
+      const inicioLog = logs.find((l: any) => l.acao === "inicio");
+      const fimLog = logs.find((l: any) => l.acao === "fim");
+      const patch: any = {};
+      if (!serv.dataInicioExec && inicioLog) {
+        patch.dataInicioExec = new Date(inicioLog.createdAt).toISOString();
+      } else if (!serv.dataInicioExec) {
+        // Sem log de inicio: usa dataFimExec ou _creationTime como fallback
+        const ref = serv.dataFimExec || serv._creationTime;
+        patch.dataInicioExec = new Date(ref).toISOString();
+      }
+      if (serv.status === "concluido" && !serv.dataFimExec) {
+        if (fimLog) {
+          patch.dataFimExec = new Date(fimLog.createdAt).toISOString();
+        } else if (serv.dataInicioExec) {
+          // Fallback: 30min depois do inicio
+          patch.dataFimExec = new Date(new Date(serv.dataInicioExec).getTime() + 30 * 60000).toISOString();
+        } else if (inicioLog) {
+          patch.dataFimExec = new Date(new Date(inicioLog.createdAt).getTime() + 30 * 60000).toISOString();
+        }
+      }
+      if (Object.keys(patch).length > 0) {
+        await ctx.runMutation(api.mutations.patchServicoCamposPublic, { id: serv._id, ...patch });
+        resultados.push({ ok: true, servicoId: serv._id, titulo: serv.titulo, patch, usouFallback: !inicioLog && !fimLog });
+      } else {
+        resultados.push({ ok: false, servicoId: serv._id, titulo: serv.titulo, error: "nada para inferir" });
+      }
+    }
+    return new Response(JSON.stringify({
+      ok: true,
+      total: alvos.length,
+      atualizados: resultados.filter((r: any) => r.ok).length,
+      semLogs: resultados.filter((r: any) => r.usouFallback).length,
+      detalhes: resultados,
+    }), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+
   return new Response(JSON.stringify({ error: `migration '${name}' not found` }), {
     status: 404,
     headers: { "Content-Type": "application/json" },

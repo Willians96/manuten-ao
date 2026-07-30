@@ -1331,6 +1331,7 @@ export const iniciarServico = mutation({
     await ctx.db.patch(args.servicoId, {
       tecnicoId: tecnico._id,
       status: "em_andamento",
+      dataInicioExec: servico.dataInicioExec ?? new Date().toISOString(),
       updatedAt: Date.now(),
     });
 
@@ -1368,6 +1369,7 @@ export const encerrarServico = mutation({
 
     await ctx.db.patch(args.servicoId, {
       status: "concluido",
+      dataFimExec: new Date().toISOString(),
       updatedAt: Date.now(),
     });
 
