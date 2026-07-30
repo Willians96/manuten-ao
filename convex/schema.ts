@@ -1,4 +1,4 @@
-import { defineSchema, defineTable } from "convex/server";
+﻿import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
 
 export default defineSchema({
@@ -63,6 +63,7 @@ export default defineSchema({
         v.literal("baixa")
       )
     ), // status de trabalho: ativo (default), ferias ou baixa
+    statusDesde: v.optional(v.number()), // timestamp do dia em que entrou nesse status (auto-expira no dia seguinte)
     modalidades: v.optional(
       v.array(
         v.union(
@@ -148,6 +149,21 @@ export default defineSchema({
   })
     .index("by_servico", ["servicoId"])
     .index("by_tecnico", ["tecnicoId"]),
+
+  // ── Feriados (nacionais / estaduais) ────────────────────────────────────
+  // Usado pra detectar "chamado extra" quando cai em data nao util.
+  // Cadastravel pelo admin em /gestor/feriados
+  feriados: defineTable({
+    data: v.string(),         // "2026-12-25"
+    nome: v.string(),          // "Natal"
+    tipo: v.union(
+      v.literal("nacional"),
+      v.literal("estadual"),
+      v.literal("municipal")
+    ),
+    createdAt: v.number(),
+  })
+    .index("by_data", ["data"]),
 
   // Logs de debug do app Android (FCM, login, etc) - visualizável em /debug-fcm
   debugLogs: defineTable({

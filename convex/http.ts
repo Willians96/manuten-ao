@@ -571,6 +571,53 @@ const runMigration = httpAction(async (ctx, request) => {
     });
   }
 
+  if (name === "seedFeriadosNacionais") {
+    // Adiciona feriados nacionais BR 2026 + 2027 (idempotente)
+    const feriados2026 = [
+      { data: "2026-01-01", nome: "Confraternizacao Universal" },
+      { data: "2026-04-03", nome: "Paixao de Cristo" },
+      { data: "2026-04-21", nome: "Tiradentes" },
+      { data: "2026-05-01", nome: "Dia do Trabalho" },
+      { data: "2026-09-07", nome: "Independencia" },
+      { data: "2026-10-12", nome: "N. Sra. Aparecida" },
+      { data: "2026-11-02", nome: "Finados" },
+      { data: "2026-11-15", nome: "Proclamacao da Republica" },
+      { data: "2026-11-20", nome: "Consciencia Negra" },
+      { data: "2026-12-25", nome: "Natal" },
+    ];
+    const feriados2027 = [
+      { data: "2027-01-01", nome: "Confraternizacao Universal" },
+      { data: "2027-03-26", nome: "Paixao de Cristo" },
+      { data: "2027-04-21", nome: "Tiradentes" },
+      { data: "2027-05-01", nome: "Dia do Trabalho" },
+      { data: "2027-09-07", nome: "Independencia" },
+      { data: "2027-10-12", nome: "N. Sra. Aparecida" },
+      { data: "2027-11-02", nome: "Finados" },
+      { data: "2027-11-15", nome: "Proclamacao da Republica" },
+      { data: "2027-11-20", nome: "Consciencia Negra" },
+      { data: "2027-12-25", nome: "Natal" },
+    ];
+    const todos = [...feriados2026, ...feriados2027];
+    const adicionados: any[] = [];
+    const jaExistentes: any[] = [];
+    for (const f of todos) {
+      const r = await ctx.runMutation(api.mutations.addFeriadoPublic, {
+        data: f.data, nome: f.nome, tipo: "nacional",
+      });
+      if (r.ok) adicionados.push(f);
+      else jaExistentes.push(f);
+    }
+    return new Response(JSON.stringify({
+      ok: true,
+      adicionados: adicionados.length,
+      jaExistentes: jaExistentes.length,
+      detalhes: { adicionados, jaExistentes },
+    }), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+
   return new Response(JSON.stringify({ error: `migration '${name}' not found` }), {
     status: 404,
     headers: { "Content-Type": "application/json" },

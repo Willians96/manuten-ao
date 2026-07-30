@@ -821,6 +821,110 @@ export const listServicosSemDataInicioPublic = query({
   },
 });
 
+// Lista todos os feriados cadastrados
+export const listFeriados = query({
+  args: {},
+  handler: async (ctx) => {
+    return await ctx.db.query("feriados").withIndex("by_data").collect();
+  },
+});
+
+// Adiciona feriado (admin)
+export const addFeriado = mutation({
+  args: {
+    data: v.string(),
+    nome: v.string(),
+    tipo: v.union(v.literal("nacional"), v.literal("estadual"), v.literal("municipal")),
+  },
+  handler: async (ctx, args) => {
+    // Verifica se ja existe
+    const existing = await ctx.db.query("feriados").withIndex("by_data", (q: any) => q.eq("data", args.data)).first();
+    if (existing) {
+      return { ok: false, error: "Feriado ja cadastrado nesta data", id: existing._id };
+    }
+    const id = await ctx.db.insert("feriados", {
+      data: args.data,
+      nome: args.nome,
+      tipo: args.tipo,
+      createdAt: Date.now(),
+    });
+    return { ok: true, id };
+  },
+});
+
+// Remove feriado (admin)
+export const removeFeriado = mutation({
+  args: { id: v.id("feriados") },
+  handler: async (ctx, args) => {
+    await ctx.db.delete(args.id);
+    return { ok: true };
+  },
+});
+
+// Seta o status do proprio tecnico (ferias/baixa/ativo)
+// Valido so pro dia acionado. No dia seguinte, auto-reseta pra "ativo"
+export const setMeuStatusTecnico = mutation({
+  args: {
+    status: v.union(v.literal("ativo"), v.literal("ferias"), v.literal("baixa")),
+    observacao: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const userId = await getCurrentUserId(ctx);
+    if (!userId) throw new Error("Nao autenticado");
+    const user = await ctx.db.query("users").withIndex("by_clerkId", (q: any) => q.eq("clerkId", userId)).first();
+    if (!user) throw new Error("Usuario nao encontrado");
+    const tecnico = await ctx.db.query("tecnicos").withIndex("by_user", (q: any) => q.eq("userId", user._id)).first();
+    if (!tecnico) throw new Error("Tecnico nao cadastrado");
+    // Auto-reseta: se o statusDesde e de um dia anterior, considera como novo status
+    const agora = new Date();
+    const hojeStr = agora.toISOString().slice(0, 10); // YYYY-MM-DD
+    let statusDesde = Date.now();
+    // Valido so pro dia: marca com timestamp; no proximo dia, outro usuario/gestor ve como expirado
+    if (args.status === "ativo") {
+      // Limpa o status (volta a ser ativo)
+      await ctx.db.patch(tecnico._id, {
+        status: "ativo",
+        statusDesde: undefined,
+      });
+    } else {
+      await ctx.db.patch(tecnico._id, {
+        status: args.status,
+        statusDesde: Date.now(),
+        // @ts-ignore
+        folgaObservacao: args.observacao,
+      });
+    }
+    return { ok: true, status: args.status, hojeStr };
+  },
+});
+
+// Query public: lista feriados
+export const listFeriadosPublic = query({
+  args: {},
+  handler: async (ctx) => {
+    return await ctx.db.query("feriados").withIndex("by_data").collect();
+  },
+});
+
+// Adiciona feriado (public, via httpAction)
+export const addFeriadoPublic = mutation({
+  args: {
+    data: v.string(),
+    nome: v.string(),
+    tipo: v.union(v.literal("nacional"), v.literal("estadual"), v.literal("municipal")),
+  },
+  handler: async (ctx, args) => {
+    const existing = await ctx.db.query("feriados").withIndex("by_data", (q: any) => q.eq("data", args.data)).first();
+    if (existing) {
+      return { ok: false, error: "Ja existe", id: existing._id };
+    }
+    const id = await ctx.db.insert("feriados", {
+      data: args.data, nome: args.nome, tipo: args.tipo, createdAt: Date.now(),
+    });
+    return { ok: true, id };
+  },
+});
+
 export const findServicoByTituloPublic = query({
   args: { titulo: v.string() },
   handler: async (ctx, args) => {
