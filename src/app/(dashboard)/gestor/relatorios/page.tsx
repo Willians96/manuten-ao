@@ -4,6 +4,8 @@ import { useQuery } from "convex/react";
 import { api } from "../../../../../convex/_generated/api";
 import { useMemo } from "react";
 import * as XLSX from "xlsx";
+import { useState } from "react";
+import { ehChamadoExtra } from "../../../../lib/extra";
 import { RoleGuard } from "../../../../components/RoleGuard";
 
 export const dynamic = "force-dynamic";
@@ -22,6 +24,9 @@ function RelatoriosPageContent() {
   const equipes = useQuery(api.mutations.listEquipes, {});
   const tecnicos = useQuery(api.mutations.listTecnicos, {});
   const usuarios = useQuery(api.mutations.listAllUsers, {});
+  const feriados = useQuery(api.mutations.listFeriados, {}) ?? [];
+  const feriadosDatas = feriados.map((f: any) => f.data);
+  const [filtroTipo, setFiltroTipo] = useState<"todos"|"extras"|"normais">("todos");
 
   // Helper: pega o nome do solicitante do serviço (user real OU dadosSolicitante)
   const solicitanteNome = (sv: any): string => {
@@ -92,17 +97,27 @@ function RelatoriosPageContent() {
       .slice(0, 10);
 
     // Serviços REALIZADOS (concluídos) por equipe com data
-    const concluidos = servicos.filter((s: any) => s.status === "concluido");
+    let concluidos = servicos.filter((s: any) => s.status === "concluido");
+    const feriadosDatas = feriados.map((f: any) => f.data);
+    // Aplica filtro de tipo (extras/normais)
+    if (filtroTipo !== "todos") {
+      concluidos = concluidos.filter((s: any) => {
+        const tecF = (tecnicos ?? []).find((t: any) => t._id === s.tecnicoId);
+        const eqF = (equipes ?? []).find((e: any) => e._id === s.equipeId);
+        const info = ehChamadoExtra({ servico: s, tecnico: tecF, equipe: eqF, feriados: feriadosDatas });
+        return filtroTipo === "extras" ? info.isExtra : !info.isExtra;
+      });
+    }
     const porEquipeComData: {
       equipe: string;
-      servicos: { titulo: string; data: string; tecnico: string; duracao: number; local: string; solicitante: string }[];
+      servicos: { titulo: string; data: string; tecnico: string; duracao: number; local: string; solicitante: string; tipo: string; motivoTipo: string }[];
     }[] = [];
     for (const eq of equipes) {
       const daEquipe = concluidos
         .filter((s: any) => s.equipeId === eq._id)
         .map((s: any) => {
           // pega o tecnico
-          const tec = tecnicos.find((t: any) => t._id === s.tecnicoId);
+          const tec = (tecnicos ?? []).find((t: any) => t._id === s.tecnicoId);
           // calcula duracao
           let duracao = 0;
           if (s.dataInicioExec && s.dataFimExec) {
@@ -121,6 +136,16 @@ function RelatoriosPageContent() {
             duracao,
             local: s.local,
             solicitante: solicitanteNome(s),
+            tipo: (() => {
+              const eqServ = (equipes ?? []).find((e: any) => e._id === s.equipeId);
+              const info = ehChamadoExtra({ servico: s, tecnico: tec, equipe: eqServ, feriados: feriadosDatas });
+              return info.label;
+            })(),
+            motivoTipo: (() => {
+              const eqServ = (equipes ?? []).find((e: any) => e._id === s.equipeId);
+              const info = ehChamadoExtra({ servico: s, tecnico: tec, equipe: eqServ, feriados: feriadosDatas });
+              return info.motivo;
+            })(),
           };
         })
         .sort((a: any, b: any) => {
@@ -188,24 +213,24 @@ function RelatoriosPageContent() {
       const data: any[][] = [
         [`SERVIÇOS REALIZADOS — ${grupo.equipe.toUpperCase()}`],
         [],
-        ["Data", "Serviço", "Local", "Solicitante", "Técnico", "Duração (min)"],
+        ["Data", "Serviço", "Local", "Solicitante", "Técnico", "Duração (min)", "Tipo"],
       ];
       if (grupo.servicos.length === 0) {
         data.push(["—", "Nenhum serviço concluído por esta equipe", "—", "—", "—", "—"]);
       } else {
         grupo.servicos.forEach((s) => {
-          data.push([s.data, s.titulo, s.local, s.solicitante, s.tecnico, s.duracao > 0 ? s.duracao : "—"]);
+          data.push([s.data, s.titulo, s.local, s.solicitante, s.tecnico, s.duracao > 0 ? s.duracao : "—", s.tipo || "Normal"]);
         });
       }
       const ws = XLSX.utils.aoa_to_sheet(data);
-      ws["!cols"] = [{ wch: 12 }, { wch: 40 }, { wch: 25 }, { wch: 22 }, { wch: 20 }, { wch: 14 }];
+      ws["!cols"] = [{ wch: 12 }, { wch: 40 }, { wch: 25 }, { wch: 22 }, { wch: 20 }, { wch: 14 }, { wch: 32 }];
       const sheetName = grupo.equipe.replace(/[^\w]/g, "").slice(0, 28) || "Equipe";
       XLSX.utils.book_append_sheet(wb, ws, sheetName);
     });
 
     // ── Aba final: Todos os Serviços (lista completa) ──
     const todosData: any[][] = [
-      ["ID", "Título", "Local", "Urgência", "Status", "Solicitante", "Equipe", "Cadastro", "Início Exec", "Fim Exec"],
+      ["ID", "Título", "Local", "Urgência", "Status", "Solicitante", "Equipe", "Cadastro", "Início Exec", "Fim Exec", "Tipo"],
     ];
     servicos.forEach((s: any) => {
       todosData.push([
@@ -219,10 +244,15 @@ function RelatoriosPageContent() {
         new Date(s._creationTime).toLocaleString("pt-BR"),
         s.dataInicioExec ?? "",
         s.dataFimExec ?? "",
+        (() => {
+          const eq = (equipes ?? []).find((e: any) => e._id === s.equipeId);
+          const tec = (tecnicos ?? []).find((t: any) => t._id === s.tecnicoId);
+          return ehChamadoExtra({ servico: s, tecnico: tec, equipe: eq, feriados: feriadosDatas }).label || "Normal";
+        })(),
       ]);
     });
     const wsTodos = XLSX.utils.aoa_to_sheet(todosData);
-    wsTodos["!cols"] = [{ wch: 8 }, { wch: 40 }, { wch: 25 }, { wch: 12 }, { wch: 14 }, { wch: 22 }, { wch: 18 }, { wch: 20 }, { wch: 18 }, { wch: 18 }];
+    wsTodos["!cols"] = [{ wch: 8 }, { wch: 40 }, { wch: 25 }, { wch: 12 }, { wch: 14 }, { wch: 22 }, { wch: 18 }, { wch: 20 }, { wch: 18 }, { wch: 18 }, { wch: 32 }];
     XLSX.utils.book_append_sheet(wb, wsTodos, "Todos os Servicos");
 
     // Gera e baixa o arquivo
@@ -252,7 +282,13 @@ function RelatoriosPageContent() {
     <div className="page-container" style={{ maxWidth: 1100 }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20, flexWrap: "wrap", gap: 12 }}>
         <h1 className="page-title" style={{ margin: 0 }}>📊 Relatórios</h1>
-        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+          <label style={{ fontSize: 13, color: "#374151", fontWeight: 600 }}>Filtrar:</label>
+          <select value={filtroTipo} onChange={(e) => setFiltroTipo(e.target.value as any)} style={{ padding: "6px 10px", borderRadius: 6, border: "1px solid #d1d5db", fontSize: 13, background: "#fff" }}>
+            <option value="todos">Todos</option>
+            <option value="normais">Apenas normais</option>
+            <option value="extras">Apenas Acionado emergencialmente na folga</option>
+          </select>
           <button onClick={exportXLSX} className="btn btn-primary">📥 Exportar Excel</button>
           <button onClick={printPage} className="btn btn-outline">🖨 Imprimir</button>
         </div>
@@ -452,6 +488,7 @@ function RelatoriosPageContent() {
                     <th>Solicitante</th>
                     <th>Técnico</th>
                     <th style={{ width: 80 }}>Duração</th>
+                    <th style={{ width: 220 }}>Tipo</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -463,6 +500,7 @@ function RelatoriosPageContent() {
                       <td style={{ fontSize: 13 }}>{s.solicitante}</td>
                       <td style={{ fontSize: 13 }}>{s.tecnico}</td>
                       <td style={{ fontSize: 13 }}>{s.duracao > 0 ? `${s.duracao} min` : "—"}</td>
+                      <td style={{ fontSize: 11 }}>{s.tipo ? <span style={{ background: "#fed7aa", color: "#9a3412", padding: "2px 6px", borderRadius: 4, fontWeight: 700, whiteSpace: "nowrap" }} title={s.motivoTipo}>â  {s.tipo}</span> : <span style={{ color: "#9ca3af" }}>Normal</span>}</td>
                     </tr>
                   ))}
                 </tbody>
