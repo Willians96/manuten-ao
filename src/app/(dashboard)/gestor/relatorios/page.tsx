@@ -12,7 +12,7 @@ export const dynamic = "force-dynamic";
 
 export default function RelatoriosPage() {
   return (
-    <RoleGuard allow={["gestor", "admin"]}>
+    <RoleGuard allow={["gestor", "admin", "tecnico"]}>
       <RelatoriosPageContent />
     </RoleGuard>
   );
