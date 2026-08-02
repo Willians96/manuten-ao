@@ -42,7 +42,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   const links = [
     { href: "/gestor", label: "Dashboard", icon: "📊", roles: ["gestor", "admin"] },
-    { href: "/gestor/relatorios", label: "Relatórios", icon: "📈", roles: ["gestor", "admin"] },
+    { href: "/gestor/relatorios", label: "Relatórios", icon: "📈", roles: ["gestor", "admin", "tecnico"] },
     { href: "/gestor/aprovar", label: "Aprovar Usuários", icon: "👥", roles: ["gestor", "admin"] },
     { href: "/gestor/equipes", label: "Equipes", icon: "🔧", roles: ["gestor", "admin"] },
   { href: "/gestor/feriados", label: "Feriados", icon: "📅", roles: ["gestor", "admin"] },
