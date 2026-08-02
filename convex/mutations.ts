@@ -925,6 +925,58 @@ export const addFeriadoPublic = mutation({
   },
 });
 
+// Lista folgas retroativas de um tecnico
+export const listFolgasTecnico = query({
+  args: { userId: v.optional(v.id("users")) },
+  handler: async (ctx, args) => {
+    if (args.userId) {
+      return await ctx.db.query("folgasTecnico").withIndex("by_user", (q: any) => q.eq("userId", args.userId!)).collect();
+    }
+    return await ctx.db.query("folgasTecnico").collect();
+  },
+});
+
+// Adiciona folga retroativa (admin ou tecnico registra propria)
+export const addFolgaRetroativa = mutation({
+  args: {
+    userId: v.id("users"),
+    data: v.string(), // "2026-07-30"
+    motivo: v.union(v.literal("ferias"), v.literal("baixa"), v.literal("folga")),
+    observacao: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    // Verifica se ja existe
+    const existing = await ctx.db.query("folgasTecnico")
+      .withIndex("by_user_data", (q: any) => q.eq("userId", args.userId).eq("data", args.data))
+      .first();
+    if (existing) {
+      // Atualiza
+      await ctx.db.patch(existing._id, {
+        motivo: args.motivo,
+        observacao: args.observacao,
+      });
+      return { ok: true, id: existing._id, updated: true };
+    }
+    const id = await ctx.db.insert("folgasTecnico", {
+      userId: args.userId,
+      data: args.data,
+      motivo: args.motivo,
+      observacao: args.observacao,
+      createdAt: Date.now(),
+    });
+    return { ok: true, id, updated: false };
+  },
+});
+
+// Remove folga retroativa
+export const removeFolgaRetroativa = mutation({
+  args: { id: v.id("folgasTecnico") },
+  handler: async (ctx, args) => {
+    await ctx.db.delete(args.id);
+    return { ok: true };
+  },
+});
+
 export const findServicoByTituloPublic = query({
   args: { titulo: v.string() },
   handler: async (ctx, args) => {

@@ -25,6 +25,7 @@ function RelatoriosPageContent() {
   const tecnicos = useQuery(api.mutations.listTecnicos, {});
   const usuarios = useQuery(api.mutations.listAllUsers, {});
   const feriados = useQuery(api.mutations.listFeriados, {}) ?? [];
+  const folgasRetroativas = useQuery(api.mutations.listFolgasTecnico, {}) ?? [];
   const feriadosDatas = feriados.map((f: any) => f.data);
   const [filtroTipo, setFiltroTipo] = useState<"todos"|"extras"|"normais">("todos");
 
@@ -104,7 +105,7 @@ function RelatoriosPageContent() {
       concluidos = concluidos.filter((s: any) => {
         const tecF = (tecnicos ?? []).find((t: any) => t._id === s.tecnicoId);
         const eqF = (equipes ?? []).find((e: any) => e._id === s.equipeId);
-        const info = ehChamadoExtra({ servico: s, tecnico: tecF, equipe: eqF, feriados: feriadosDatas });
+        const info = ehChamadoExtra({ servico: s, tecnico: tecF, equipe: eqF, feriados: feriadosDatas, folgasRetroativas: (folgasRetroativas as any).map((f: any) => ({ data: f.data, motivo: f.motivo })) });
         return filtroTipo === "extras" ? info.isExtra : !info.isExtra;
       });
     }
@@ -138,7 +139,7 @@ function RelatoriosPageContent() {
             solicitante: solicitanteNome(s),
             tipo: (() => {
               const eqServ = (equipes ?? []).find((e: any) => e._id === s.equipeId);
-              const info = ehChamadoExtra({ servico: s, tecnico: tec, equipe: eqServ, feriados: feriadosDatas });
+              const info = ehChamadoExtra({ servico: s, tecnico: tec, equipe: eqServ, feriados: feriadosDatas, folgasRetroativas: (folgasRetroativas as any).map((f: any) => ({ data: f.data, motivo: f.motivo })) });
               return info.label;
             })(),
             motivoTipo: (() => {

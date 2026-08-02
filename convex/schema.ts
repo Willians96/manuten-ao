@@ -151,6 +151,25 @@ export default defineSchema({
     .index("by_servico", ["servicoId"])
     .index("by_tecnico", ["tecnicoId"]),
 
+  // ── Folgas retroativas do técnico ──────────────────────────────────────
+  // Usado pra registrar folgas/baixas/ferias em datas passadas (retroativo)
+  // e afetar a classificação de "Acionado emergencialmente na folga"
+  // no relatório. Cada registro vale só pro dia (dataInicio == dataFim).
+  folgasTecnico: defineTable({
+    userId: v.id("users"),
+    data: v.string(), // "2026-07-30" - YYYY-MM-DD
+    motivo: v.union(
+      v.literal("ferias"),
+      v.literal("baixa"),
+      v.literal("folga")
+    ),
+    observacao: v.optional(v.string()),
+    createdAt: v.number(),
+  })
+    .index("by_user", ["userId"])
+    .index("by_data", ["data"])
+    .index("by_user_data", ["userId", "data"]),
+
   // ── Feriados (nacionais / estaduais) ────────────────────────────────────
   // Usado pra detectar "chamado extra" quando cai em data nao util.
   // Cadastravel pelo admin em /gestor/feriados

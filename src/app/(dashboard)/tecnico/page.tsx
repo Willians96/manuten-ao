@@ -26,6 +26,7 @@ function TecnicoPageContent() {
   const retomar = useMutation(api.mutations.retomarServico);
   const criarDireto = useMutation(api.mutations.criarServicoDireto);
   const feriados = useQuery(api.mutations.listFeriados, {}) ?? [];
+  const folgasRetroativas = useQuery(api.mutations.listFolgasTecnico, {}) ?? [];
   const setStatus = useMutation(api.mutations.setMeuStatusTecnico);
 
   // Acha o tecnico atual (vinculado ao user logado)
@@ -346,7 +347,7 @@ function TecnicoPageContent() {
           {pausados.map((s: any) => {
             const eqOrigem = (equipes ?? []).find((e: any) => e._id === s.equipeId);
             const deOutraEquipe = tecnico && s.equipeId !== tecnico.equipeId;
-            const extraP = ehChamadoExtra({ servico: s, tecnico, equipe: (equipes ?? []).find((e: any) => e._id === s.equipeId), feriados: feriados.map((f: any) => f.data) });
+            const extraP = ehChamadoExtra({ servico: s, tecnico, equipe: (equipes ?? []).find((e: any) => e._id === s.equipeId), feriados: feriados.map((f: any) => f.data), folgasRetroativas: (folgasRetroativas as any).map((f: any) => ({ data: f.data, motivo: f.motivo })) });
           return (
               <div key={s._id} className="card" style={{ borderLeft: `4px solid ${deOutraEquipe ? "#003882" : "#c2410c"}`, background: "#fff7ed" }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12 }}>
@@ -440,7 +441,7 @@ function TecnicoPageContent() {
                 🎯 Atribuídos a mim ({aguardandoMeus.length})
               </div>
               {aguardandoMeus.map((s: any) => (
-                <ServicoCard key={s._id} servico={s} onIniciar={handleIniciar} tecnico={tecnico} equipes={equipes} feriados={feriados} />
+                <ServicoCard key={s._id} servico={s} onIniciar={handleIniciar} tecnico={tecnico} equipes={equipes} feriados={feriados} folgasRetroativas={folgasRetroativas} />
               ))}
             </>
           )}
@@ -452,7 +453,7 @@ function TecnicoPageContent() {
                 🤝 Disponíveis na equipe ({aguardandoEquipe.length}) — qualquer um pode pegar
               </div>
               {aguardandoEquipe.map((s: any) => (
-                <ServicoCard key={s._id} servico={s} onIniciar={handleIniciar} tecnico={tecnico} equipes={equipes} feriados={feriados} />
+                <ServicoCard key={s._id} servico={s} onIniciar={handleIniciar} tecnico={tecnico} equipes={equipes} feriados={feriados} folgasRetroativas={folgasRetroativas} />
               ))}
             </>
           )}
@@ -468,7 +469,7 @@ function TecnicoPageContent() {
                 👥 Atribuídos a outros da equipe ({aguardandoOutros.length}) — você não pode pegar
               </div>
               {aguardandoOutros.map((s: any) => (
-                <ServicoCard key={s._id} servico={s} onIniciar={handleIniciar} tecnico={tecnico} equipes={equipes} feriados={feriados} />
+                <ServicoCard key={s._id} servico={s} onIniciar={handleIniciar} tecnico={tecnico} equipes={equipes} feriados={feriados} folgasRetroativas={folgasRetroativas} />
               ))}
             </>
           )}
@@ -519,10 +520,10 @@ function TecnicoPageContent() {
 }
 
 // ── Card genérico ─────────────────────────────────────────────────────────
-function ServicoCard({ servico: s, onIniciar, onEncerrar, onPausar, showPausar, tecnico, equipes, feriados }: any) {
+function ServicoCard({ servico: s, onIniciar, onEncerrar, onPausar, showPausar, tecnico, equipes, feriados, folgasRetroativas }: any) {
   const borderColor = s.status === "em_andamento" ? "#e30613" : "#1e40af";
   const equipeServ = (equipes ?? []).find((e: any) => e._id === s.equipeId);
-  const extraInfo = ehChamadoExtra({ servico: s, tecnico, equipe: equipeServ, feriados: (feriados ?? []).map((f: any) => f.data) });
+  const extraInfo = ehChamadoExtra({ servico: s, tecnico, equipe: equipeServ, feriados: (feriados ?? []).map((f: any) => f.data), folgasRetroativas: (folgasRetroativas as any).map((f: any) => ({ data: f.data, motivo: f.motivo })) });
   return (
     <div className="card" style={{ borderLeft: `4px solid ${borderColor}` }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12 }}>

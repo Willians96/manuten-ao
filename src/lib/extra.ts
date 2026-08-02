@@ -103,7 +103,7 @@ export type ExtraArgs = {
   };
   tecnico?: {
     modalidades?: string[]; // ["informatica"] ou ["servicos_gerais"]
-    status?: string; // "ativo" | "ferias" | "baixa"
+    status?: string; // "ativo" | "ferias" | "baixa" | "folga"
     statusDesde?: number;
   } | null;
   equipe?: {
@@ -111,6 +111,8 @@ export type ExtraArgs = {
   } | null;
   // Lista de datas (YYYY-MM-DD) que sao feriados - vem do banco
   feriados?: string[];
+  // Lista de folgas retroativas do tecnico (userId, data) - do banco
+  folgasRetroativas?: { data: string; motivo: string }[];
 };
 
 export function ehChamadoExtra(args: ExtraArgs): ExtraInfo {
@@ -142,6 +144,22 @@ export function ehChamadoExtra(args: ExtraArgs): ExtraInfo {
 
   // Caso 1: Tecnico em folga (ferias/baixa) E servico no mesmo dia
   // => "Acionado emergencialmente na folga"
+  // Caso 1a: Folga retroativa cadastrada para o tecnico NESTA data
+  if (args.folgasRetroativas && args.folgasRetroativas.length > 0) {
+    const folga = args.folgasRetroativas.find((f: any) => f.data === dataStr);
+    if (folga) {
+      let motivoStatus = "baixa medica";
+      if (folga.motivo === "ferias") motivoStatus = "ferias";
+      else if (folga.motivo === "folga") motivoStatus = "folga";
+      return {
+        isExtra: true,
+        label: "Acionado emergencialmente na folga",
+        motivo: "Tecnico em " + motivoStatus + " neste dia (retroativo)",
+      };
+    }
+  }
+
+  // Caso 1b: Tecnico em folga HOJE (clicou no botao "Estou de folga hoje")
   if (tecnico.status && tecnico.status !== "ativo" && tecnico.statusDesde) {
     const desdeData = new Date(tecnico.statusDesde);
     const desdeStr = desdeData.toISOString().slice(0, 10);

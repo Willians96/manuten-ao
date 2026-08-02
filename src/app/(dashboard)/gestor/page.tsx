@@ -22,6 +22,7 @@ function GestorPageContent() {
   const equipes = useQuery(api.mutations.listEquipes, {});
   const tecnicos = useQuery(api.mutations.listTecnicos, {});
   const feriados = useQuery(api.mutations.listFeriados, {}) ?? [];
+  const folgasRetroativas = useQuery(api.mutations.listFolgasTecnico, {}) ?? [];
   const me = useQuery(api.mutations.me);
   const atribuir = useMutation(api.mutations.atribuirServico);
   const excluir = useMutation(api.mutations.excluirServico);
@@ -44,7 +45,7 @@ function GestorPageContent() {
       if (t < inicioMes || t >= fimMes) return false;
       const tec = (tecnicos ?? []).find((tc: any) => tc._id === s.tecnicoId);
       const eq = (equipes ?? []).find((e: any) => e._id === s.equipeId);
-      return ehChamadoExtra({ servico: s, tecnico: tec, equipe: eq, feriados: feriadosDatas }).isExtra;
+      return ehChamadoExtra({ servico: s, tecnico: tec, equipe: eq, feriados: feriadosDatas, folgasRetroativas: (folgasRetroativas as any).map((f: any) => ({ data: f.data, motivo: f.motivo })) }).isExtra;
     }).length;
   })();
 
