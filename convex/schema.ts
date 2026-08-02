@@ -60,9 +60,10 @@ export default defineSchema({
       v.union(
         v.literal("ativo"),
         v.literal("ferias"),
-        v.literal("baixa")
+        v.literal("baixa"),
+        v.literal("folga")
       )
-    ), // status de trabalho: ativo (default), ferias ou baixa
+    ), // status de trabalho: ativo (default), ferias, baixa ou folga
     statusDesde: v.optional(v.number()), // timestamp do dia em que entrou nesse status (auto-expira no dia seguinte)
     modalidades: v.optional(
       v.array(

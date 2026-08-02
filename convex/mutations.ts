@@ -865,7 +865,7 @@ export const removeFeriado = mutation({
 // Valido so pro dia acionado. No dia seguinte, auto-reseta pra "ativo"
 export const setMeuStatusTecnico = mutation({
   args: {
-    status: v.union(v.literal("ativo"), v.literal("ferias"), v.literal("baixa")),
+    status: v.union(v.literal("ativo"), v.literal("ferias"), v.literal("baixa"), v.literal("folga")),
     observacao: v.optional(v.string()),
   },
   handler: async (ctx, args) => {

@@ -41,7 +41,7 @@ function TecnicoPageContent() {
   const [motivoPausa, setMotivoPausa] = useState("");
   const [showCadastroRapido, setShowCadastroRapido] = useState(false);
   const [showFolgaModal, setShowFolgaModal] = useState(false);
-  const [motivoFolga, setMotivoFolga] = useState<"ferias"|"baixa">("baixa");
+  const [motivoFolga, setMotivoFolga] = useState<"ferias"|"baixa"|"folga">("baixa");
   const [obsFolga, setObsFolga] = useState("");
 
   // Verifica se o tecnico esta em folga HOJE
@@ -148,7 +148,7 @@ function TecnicoPageContent() {
           display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap",
         }}>
           <div>
-            <strong>🌴 Você está de {tecnico?.status === "ferias" ? "férias" : "baixa"} hoje.</strong>{" "}
+            <strong>🌴 Você está de {tecnico?.status === "ferias" ? "férias" : tecnico?.status === "folga" ? "folga" : "baixa"} hoje.</strong>{" "}
             Qualquer serviço que você atender agora será marcado como <strong>"Acionado emergencialmente na folga"</strong> nos relatórios.
           </div>
           <button className="btn btn-outline" style={{ fontSize: 13, padding: "6px 12px" }} onClick={() => setShowFolgaModal(true)}>
@@ -194,6 +194,7 @@ function TecnicoPageContent() {
                 <select value={motivoFolga} onChange={(e) => setMotivoFolga(e.target.value as any)} style={{ fontSize: 16, padding: "12px 14px" }}>
                   <option value="baixa">Baixa médica</option>
                   <option value="ferias">Férias</option>
+                  <option value="folga">Folga</option>
                 </select>
               </div>
               <div className="form-group" style={{ marginBottom: 16 }}>

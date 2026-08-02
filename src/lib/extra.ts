@@ -1,4 +1,4 @@
-// src/lib/extra.ts - Helper pra detectar "Acionado emergencialmente na folga"
+﻿// src/lib/extra.ts - Helper pra detectar "Acionado emergencialmente na folga"
 // Funcao pura: recebe dados, retorna { isExtra, label, motivo }
 // Usada em /tecnico (cards), /gestor/relatorios (filtros + coluna), /gestor (dashboard)
 
@@ -35,14 +35,37 @@ const FERIADOS_NACIONAIS_FALLBACK = new Set([
 ]);
 
 // Converte "2026-07-29T12:58" ou "2026-07-29" pra { dataStr: "2026-07-29", hora: 12, min: 58 }
-function parseDataHora(s: string | undefined): { dataStr: string; hora: number; min: number } | null {
+// IMPORTANTE: usa new Date(s).getHours() que converte UTC->local automaticamente
+// Assim "2026-07-30T13:54:15.154Z" vira 10:54 BRT (correto)
+function parseDataHora(s: string | undefined): { dataStr: string; hora: number; min: number; dow: number } | null {
   if (!s) return null;
   // Tenta ISO com T
   const m1 = s.match(/^(\d{4}-\d{2}-\d{2})T(\d{2}):(\d{2})/);
-  if (m1) return { dataStr: m1[1], hora: parseInt(m1[2], 10), min: parseInt(m1[3], 10) };
-  // Tenta so data
+  if (m1) {
+    // Cria Date com a string inteira (que pode ter Z ou não) e extrai hora/min LOCAL
+    const d = new Date(s);
+    if (!isNaN(d.getTime())) {
+      return {
+        dataStr: m1[1],
+        hora: d.getHours(),
+        min: d.getMinutes(),
+        dow: d.getDay(),
+      };
+    }
+  }
+  // Tenta só data
   const m2 = s.match(/^(\d{4}-\d{2}-\d{2})/);
-  if (m2) return { dataStr: m2[1], hora: 0, min: 0 };
+  if (m2) {
+    const d = new Date(s + "T12:00:00"); // meio-dia pra evitar TZ bug
+    if (!isNaN(d.getTime())) {
+      return {
+        dataStr: m2[1],
+        hora: d.getHours(),
+        min: d.getMinutes(),
+        dow: d.getDay(),
+      };
+    }
+  }
   return null;
 }
 
@@ -102,8 +125,7 @@ export function ehChamadoExtra(args: ExtraArgs): ExtraInfo {
   // Se nao tem dataInicioExec, nao da pra classificar
   if (!ini) return { isExtra: false, label: "", motivo: "Sem data de inicio registrada" };
 
-  const data = new Date(ini.dataStr + "T00:00:00");
-  const dow = data.getDay();
+  const dow = ini.dow;
   const dataStr = ini.dataStr;
 
   // Combina feriados do banco com fallback
@@ -124,10 +146,13 @@ export function ehChamadoExtra(args: ExtraArgs): ExtraInfo {
     const desdeData = new Date(tecnico.statusDesde);
     const desdeStr = desdeData.toISOString().slice(0, 10);
     if (desdeStr === dataStr) {
+      let motivoStatus = "baixa medica";
+      if (tecnico.status === "ferias") motivoStatus = "ferias";
+      else if (tecnico.status === "folga") motivoStatus = "folga";
       return {
         isExtra: true,
         label: "Acionado emergencialmente na folga",
-        motivo: "Tecnico em " + (tecnico.status === "ferias" ? "ferias" : "baixa medica") + " neste dia",
+        motivo: "Tecnico em " + motivoStatus + " neste dia",
       };
     }
   }
@@ -170,8 +195,7 @@ export function ehChamadoExtra(args: ExtraArgs): ExtraInfo {
 
   // Caso 5: Fim cai fora do expediente (mas inicio dentro)
   if (fim) {
-    const fimData = new Date(fim.dataStr + "T00:00:00");
-    const fimDow = fimData.getDay();
+    const fimDow = fim.dow;
     const fimDentro = ehTI
       ? isDentroExpedienteTI(fimDow, fim.hora, fim.min)
       : isDentroExpedienteSG(fimDow, fim.hora, fim.min);
@@ -191,5 +215,6 @@ export function ehChamadoExtra(args: ExtraArgs): ExtraInfo {
 export function statusTecnicoLabel(status?: string): string {
   if (status === "ferias") return "Ferias";
   if (status === "baixa") return "Baixa Medica";
+  if (status === "folga") return "Folga";
   return "Ativo";
 }
