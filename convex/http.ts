@@ -618,6 +618,29 @@ const runMigration = httpAction(async (ctx, request) => {
     });
   }
 
+  if (name === "addFolgaRetroativa") {
+    // Cadastra folga retroativa: { userId, data, motivo, observacao }
+    if (!migArgs || !migArgs.userId || !migArgs.data || !migArgs.motivo) {
+      return new Response(JSON.stringify({ error: "userId, data e motivo sao obrigatorios" }), {
+        status: 400,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+    // Verifica se ja existe
+    const existing = await ctx.runQuery("servicosPorUserData" as any, { userId: migArgs.userId, data: migArgs.data }).catch(() => null);
+    // Usa mutation direta via api
+    const r = await ctx.runMutation(api.mutations.addFolgaRetroativa, {
+      userId: migArgs.userId,
+      data: migArgs.data,
+      motivo: migArgs.motivo,
+      observacao: migArgs.observacao,
+    });
+    return new Response(JSON.stringify({ ok: true, result: r }), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+
   return new Response(JSON.stringify({ error: `migration '${name}' not found` }), {
     status: 404,
     headers: { "Content-Type": "application/json" },
