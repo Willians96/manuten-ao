@@ -1,4 +1,5 @@
-﻿// convex/email.ts - Sistema de notificacao por email
+﻿"use node";
+// convex/email.ts - Sistema de notificacao por email
 // Usa Gmail SMTP via Nodemailer
 // Chamado por mutations quando servico e criado ou atribuido
 
