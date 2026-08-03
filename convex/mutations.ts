@@ -978,6 +978,14 @@ export const removeFolgaRetroativa = mutation({
   },
 });
 
+// Helper public: pega user por ID
+export const findUserByIdPublic = query({
+  args: { id: v.id("users") },
+  handler: async (ctx, args) => {
+    return await ctx.db.get(args.id);
+  },
+});
+
 export const findServicoByTituloPublic = query({
   args: { titulo: v.string() },
   handler: async (ctx, args) => {

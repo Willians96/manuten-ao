@@ -1,10 +1,11 @@
-// convex/email.ts - Sistema de notificacao por email
+﻿// convex/email.ts - Sistema de notificacao por email
 // Usa Gmail SMTP via Nodemailer
 // Chamado por mutations quando servico e criado ou atribuido
 
-import { action, internalQuery } from "./_generated/server";
+import { action } from "./_generated/server";
 import { v } from "convex/values";
 import nodemailer from "nodemailer";
+import { api } from "./_generated/api";
 
 const EMAIL_USER = process.env.EMAIL_USER || "michelwilliam@policiamilitar.sp.gov.br";
 const EMAIL_PASS = process.env.EMAIL_PASS || "";
@@ -28,21 +29,7 @@ function getTransporter() {
 }
 
 // Query interna: pegar servico por id
-export const getServicoByIdInternal = internalQuery({
-  args: { id: v.id("servicos") },
-  handler: async (ctx, args) => {
-    return await ctx.db.get(args.id);
-  },
-});
-
 // Query interna: pegar user por id
-export const getUserByIdInternal = internalQuery({
-  args: { id: v.id("users") },
-  handler: async (ctx, args) => {
-    return await ctx.db.get(args.id);
-  },
-});
-
 // Action: envia email HTML simples
 export const sendEmail = action({
   args: {
@@ -80,7 +67,7 @@ export const sendNovaSolicitacaoEmail = action({
     servicoId: v.id("servicos"),
   },
   handler: async (ctx, args) => {
-    const servico = await ctx.runQuery(getServicoByIdInternal, { id: args.servicoId });
+    const servico = await ctx.runQuery(api.mutations.findServicoByIdPublic, { id: args.servicoId });
     if (!servico) return { ok: false, error: "servico nao encontrado" };
 
     // Define destinatario baseado na modalidade
@@ -93,7 +80,7 @@ export const sendNovaSolicitacaoEmail = action({
     let solSecao = "";
     let solRe = "";
     if (servico.solicitanteId) {
-      const sol = await ctx.runQuery(getUserByIdInternal, { id: servico.solicitanteId });
+      const sol = await ctx.runQuery(api.mutations.findUserByIdPublic, { id: servico.solicitanteId });
       if (sol) {
         solNome = `${sol.graduacao ?? ""} ${sol.nomeDeGuerra ?? sol.name ?? ""}`.trim();
         solSecao = sol.secao ?? "";
