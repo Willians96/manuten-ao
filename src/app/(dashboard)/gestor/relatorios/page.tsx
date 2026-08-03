@@ -32,8 +32,10 @@ function RelatoriosPageContent() {
   // Helper: pega o nome do solicitante do serviço (user real OU dadosSolicitante)
   const solicitanteNome = (sv: any): string => {
     // Prioridade: dadosSolicitante (cadastroDireto em nome de outro) -> user real -> "—"
-    if (sv.dadosSolicitante && (sv.dadosSolicitante.nome || sv.dadosSolicitante.graduacao)) {
-      return (sv.dadosSolicitante.graduacao ?? "") + " " + (sv.dadosSolicitante.nome ?? "").trim();
+    if (sv.dadosSolicitante && (sv.dadosSolicitante.nome || sv.dadosSolicitante.nomeDeGuerra || sv.dadosSolicitante.graduacao)) {
+      // Prioriza nomeDeGuerra (sempre preenchido no cadastro rapido), fallback para nome completo
+      const nomeExibir = (sv.dadosSolicitante.nomeDeGuerra || sv.dadosSolicitante.nome || "").trim();
+      return ((sv.dadosSolicitante.graduacao ?? "") + " " + nomeExibir).trim();
     }
     if (sv.solicitanteId) {
       const u = (usuarios ?? []).find((x: any) => x._id === sv.solicitanteId);
