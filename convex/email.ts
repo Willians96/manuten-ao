@@ -39,7 +39,7 @@ export const sendEmail = action({
     html: v.string(),
     cc: v.optional(v.array(v.string())),
   },
-  handler: async (ctx, args) => {
+  handler: async (ctx, args): Promise<{ ok: boolean; error?: string; messageId?: string }> => {
     if (!EMAIL_PASS) {
       console.warn("[email] EMAIL_PASS nao configurada, pulando envio");
       return { ok: false, error: "EMAIL_PASS nao configurada" };
@@ -67,8 +67,8 @@ export const sendNovaSolicitacaoEmail = action({
   args: {
     servicoId: v.id("servicos"),
   },
-  handler: async (ctx, args) => {
-    const servico = await ctx.runQuery(api.mutations.findServicoByIdPublic, { id: args.servicoId });
+  handler: async (ctx, args): Promise<{ ok: boolean; error?: string; messageId?: string; to?: string }> => {
+    const servico: any = await ctx.runQuery(api.mutations.findServicoByIdPublic, { id: args.servicoId });
     if (!servico) return { ok: false, error: "servico nao encontrado" };
 
     // Define destinatario baseado na modalidade
