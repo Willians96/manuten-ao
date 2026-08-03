@@ -1,6 +1,7 @@
 ﻿import { v } from "convex/values";
 import { Id } from "./_generated/dataModel";
-import { mutation, query, action } from "./_generated/server";
+import { mutation, query, action, internalAction } from "./_generated/server";
+import { internal } from "./_generated/api";
 import { getCurrentUserId } from "./auth";
 
 // â”€â”€ Helper: envia push notification via FCM HTTP v1 API â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€

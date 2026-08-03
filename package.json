@@ -13,6 +13,7 @@
     "@clerk/nextjs": "^6.9.0",
     "convex": "^1.42.3",
     "next": "^15.1.0",
+    "nodemailer": "^6.10.1",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "recharts": "^2.15.0",
@@ -20,6 +21,7 @@
   },
   "devDependencies": {
     "@types/node": "^22",
+    "@types/nodemailer": "^6.4.24",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",
