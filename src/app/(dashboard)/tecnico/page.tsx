@@ -419,6 +419,7 @@ function TecnicoPageContent() {
               tecnico={tecnico}
               equipes={equipes}
               feriados={feriados}
+              folgasRetroativas={folgasRetroativas}
             />
           ))}
           {emAndamento.length === 0 && (
