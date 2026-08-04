@@ -226,7 +226,7 @@ function TecnicoPageContent() {
                   <label>Graduação</label>
                   <select value={cr.solicitanteGraduacao} onChange={set("solicitanteGraduacao")} required style={{ fontSize: 16, padding: "12px 14px" }}>
                     <option value="">Selecione...</option>
-                    {["Sd","Cb","3º Sgt","2º Sgt","1º Sgt","Asp","2º Ten","1º Ten","Cap","Maj","Ten Cel","Cel","Aluno","Civil"].map(g => (
+                    {["Sd","Cb","3º Sgt","2º Sgt","1º Sgt","Sub Ten","Asp","2º Ten","1º Ten","Cap","Maj","Ten Cel","Cel","Aluno","Civil"].map(g => (
                       <option key={g} value={g}>{g}</option>
                     ))}
                   </select>
