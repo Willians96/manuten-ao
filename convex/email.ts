@@ -68,8 +68,18 @@ export const sendNovaSolicitacaoEmail = action({
     servicoId: v.id("servicos"),
   },
   handler: async (ctx, args): Promise<{ ok: boolean; error?: string; messageId?: string; to?: string }> => {
-    const servico: any = await ctx.runQuery(api.mutations.findServicoByIdPublic, { id: args.servicoId });
-    if (!servico) return { ok: false, error: "servico nao encontrado" };
+    console.log("[email] sendNovaSolicitacaoEmail iniciada, servicoId=", args.servicoId);
+    console.log("[email] EMAIL_USER=", EMAIL_USER, "EMAIL_PASS length=", EMAIL_PASS.length, "EMAIL_SG=", EMAIL_SG);
+    let servico: any;
+    try {
+      servico = await ctx.runQuery(api.mutations.findServicoByIdPublic, { id: args.servicoId });
+    } catch (e: any) {
+      console.error("[email] ERRO ao buscar servico:", e.message);
+      return { ok: false, error: "erro buscar servico: " + e.message };
+    }
+    if (!servico) { console.error("[email] servico nao encontrado"); return { ok: false, error: "servico nao encontrado" };
+    }
+    console.log("[email] servico encontrado, modalidade=", servico.modalidade);
 
     // Define destinatario baseado na modalidade
     const modalidade = servico.modalidade ?? "servicos_gerais";
