@@ -1295,6 +1295,13 @@ export const criarServico = mutation({
       "/gestor"
     );
 
+    // Tenta enviar email (assincrono, falha silenciosa se der erro)
+    try {
+      await ctx.scheduler.runAfter(0, internal.email.sendNovaSolicitacaoEmail, { servicoId: newId });
+    } catch (e: any) {
+      console.error("[criarServico] erro ao agendar email:", e.message);
+    }
+
     return newId;
   },
 });
