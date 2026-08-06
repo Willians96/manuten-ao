@@ -1,7 +1,7 @@
 ﻿import { v } from "convex/values";
 import { Id } from "./_generated/dataModel";
 import { mutation, query, action, internalAction } from "./_generated/server";
-import { internal } from "./_generated/api";
+import { api } from "./_generated/api";
 import { getCurrentUserId } from "./auth";
 
 // â”€â”€ Helper: envia push notification via FCM HTTP v1 API â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
@@ -1297,7 +1297,7 @@ export const criarServico = mutation({
 
     // Tenta enviar email (assincrono, falha silenciosa se der erro)
     try {
-      await ctx.scheduler.runAfter(0, internal.email.sendNovaSolicitacaoEmail, { servicoId: newId });
+      await ctx.scheduler.runAfter(0, api.email.sendNovaSolicitacaoEmail, { servicoId: newId });
     } catch (e: any) {
       console.error("[criarServico] erro ao agendar email:", e.message);
     }
