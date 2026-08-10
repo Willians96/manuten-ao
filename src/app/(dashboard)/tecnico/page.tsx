@@ -44,6 +44,7 @@ function TecnicoPageContent() {
   const [showFolgaModal, setShowFolgaModal] = useState(false);
   const [motivoFolga, setMotivoFolga] = useState<"ferias"|"baixa"|"folga">("baixa");
   const [obsFolga, setObsFolga] = useState("");
+  const [filtroEquipe, setFiltroEquipe] = useState<string>("todas");
 
   // Verifica se o tecnico esta em folga HOJE
   const emFolgaHoje = tecnico && tecnico.status && tecnico.status !== "ativo" && tecnico.statusDesde
@@ -57,20 +58,25 @@ function TecnicoPageContent() {
     dataInicioExec: "", dataFimExec: "",
   });
 
-  const emAndamento = (servicos ?? []).filter((s: any) => s.status === "em_andamento");
+  // Filtra servicos pela equipe selecionada (so faz efeito pra admin; tecnicos ja vem filtrado do servidor)
+  const servicosFiltrados = (servicos ?? []).filter((s: any) =>
+    filtroEquipe === "todas" ? true : s.equipeId === filtroEquipe
+  );
+
+  const emAndamento = servicosFiltrados.filter((s: any) => s.status === "em_andamento");
 
   // Aguardando separados: atribuídos a mim vs disponíveis na equipe
-  const aguardandoMeus = (servicos ?? []).filter((s: any) =>
+  const aguardandoMeus = servicosFiltrados.filter((s: any) =>
     s.status === "aprovado" && s.tecnicoId && tecnico?._id && s.tecnicoId === tecnico._id
   );
-  const aguardandoEquipe = (servicos ?? []).filter((s: any) =>
+  const aguardandoEquipe = servicosFiltrados.filter((s: any) =>
     s.status === "aprovado" && !s.tecnicoId
   );
-  const aguardandoOutros = (servicos ?? []).filter((s: any) =>
+  const aguardandoOutros = servicosFiltrados.filter((s: any) =>
     s.status === "aprovado" && s.tecnicoId && tecnico?._id && s.tecnicoId !== tecnico._id
   );
 
-  const pausados = (servicos ?? []).filter((s: any) => s.status === "pausado");
+  const pausados = servicosFiltrados.filter((s: any) => s.status === "pausado");
 
   async function handleIniciar(servicoId: any) {
     try { await iniciar({ servicoId }); }
@@ -166,6 +172,12 @@ function TecnicoPageContent() {
               🌴 Estou de folga hoje
             </button>
           )}
+          <select value={filtroEquipe} onChange={(e) => setFiltroEquipe(e.target.value)} style={{ padding: "6px 10px", borderRadius: 6, border: "1px solid #d1d5db", fontSize: 13, background: "#fff", color: "#374151" }} title="Filtrar servicos por equipe">
+            <option value="todas">📋 Todas as equipes</option>
+            {(equipes ?? []).map((eq: any) => (
+              <option key={eq._id} value={eq._id}>👥 {eq.nome}</option>
+            ))}
+          </select>
           <button className="btn btn-primary" onClick={() => setShowCadastroRapido(!showCadastroRapido)} style={{ whiteSpace: "nowrap" }}>
             {showCadastroRapido ? "✖ Fechar" : "⚡ Cadastro Rápido"}
           </button>
