@@ -203,7 +203,7 @@ export const me = query({
 export const listServicos = query({
   args: {
     status: v.optional(v.string()),
-    modalidade: v.optional(v.union(v.literal("servicos_gerais"), v.literal("informatica"))),
+    modalidade: v.optional(v.union(v.literal("servicos_gerais"), v.literal("informatica"), v.literal("mecanica"))),
   },
   handler: async (ctx, args) => {
     const currentUserId = await getCurrentUserId(ctx);
@@ -265,7 +265,7 @@ export const listServicos = query({
 export const listTecnicos = query({
   args: {
     equipeId: v.optional(v.id("equipes")),
-    modalidade: v.optional(v.union(v.literal("servicos_gerais"), v.literal("informatica"))),
+    modalidade: v.optional(v.union(v.literal("servicos_gerais"), v.literal("informatica"), v.literal("mecanica"))),
   },
   handler: async (ctx, args) => {
     let tecnicos = await (args.equipeId
@@ -294,7 +294,7 @@ export const listTecnicos = query({
 
 export const listEquipes = query({
   args: {
-    modalidade: v.optional(v.union(v.literal("servicos_gerais"), v.literal("informatica"))),
+    modalidade: v.optional(v.union(v.literal("servicos_gerais"), v.literal("informatica"), v.literal("mecanica"))),
   },
   handler: async (ctx, args) => {
     const all = await ctx.db.query("equipes").collect();
@@ -307,7 +307,7 @@ export const listEquipes = query({
 
 export const dashboardStats = query({
   args: {
-    modalidade: v.optional(v.union(v.literal("servicos_gerais"), v.literal("informatica"))),
+    modalidade: v.optional(v.union(v.literal("servicos_gerais"), v.literal("informatica"), v.literal("mecanica"))),
   },
   handler: async (ctx, args) => {
     // Filtra por modalidade (se passada)
@@ -679,7 +679,7 @@ export const criarServicoAdminPublic = mutation({
     const dataInicioNorm = parseDataA(args.dataInicioExec);
     const dataFimNorm = parseDataA(args.dataFimExec);
     // Modalidade baseada na equipe
-    let modalidade: "servicos_gerais" | "informatica" = "servicos_gerais";
+    let modalidade: "servicos_gerais" | "informatica" | "mecanica" = "servicos_gerais";
     const equipeEscolhida = await ctx.db.get(args.equipeId);
     if (equipeEscolhida && (equipeEscolhida as any).modalidade === "informatica") {
       modalidade = "informatica";
@@ -1248,7 +1248,8 @@ export const criarServico = mutation({
     modalidade: v.optional(
       v.union(
         v.literal("servicos_gerais"),
-        v.literal("informatica")
+        v.literal("informatica"),
+        v.literal("mecanica")
       )
     ),
   },
@@ -1648,7 +1649,8 @@ export const criarServicoDireto = mutation({
     modalidade: v.optional(
       v.union(
         v.literal("servicos_gerais"),
-        v.literal("informatica")
+        v.literal("informatica"),
+        v.literal("mecanica")
       )
     ),
     // dados do solicitante
@@ -1713,7 +1715,7 @@ export const criarServicoDireto = mutation({
 
     // Determina modalidade: SG (servicos_gerais) ou TI (informatica)
     // baseado na equipe escolhida
-    let modalidade: "servicos_gerais" | "informatica" = "servicos_gerais";
+    let modalidade: "servicos_gerais" | "informatica" | "mecanica" = "servicos_gerais";
     if (equipeIdFinal) {
       const equipeEscolhida = await ctx.db.get(equipeIdFinal);
       if (equipeEscolhida && (equipeEscolhida as any).modalidade === "informatica") {
@@ -1782,7 +1784,8 @@ export const cadastrarTecnico = mutation({
       v.array(
         v.union(
           v.literal("servicos_gerais"),
-          v.literal("informatica")
+          v.literal("informatica"),
+          v.literal("mecanica")
         )
       )
     ),
@@ -2041,7 +2044,8 @@ export const editarTecnico = mutation({
       v.array(
         v.union(
           v.literal("servicos_gerais"),
-          v.literal("informatica")
+          v.literal("informatica"),
+          v.literal("mecanica")
         )
       )
     ),

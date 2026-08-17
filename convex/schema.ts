@@ -38,7 +38,8 @@ export default defineSchema({
     modalidade: v.optional(
       v.union(
         v.literal("servicos_gerais"),
-        v.literal("informatica")
+        v.literal("informatica"),
+        v.literal("mecanica")
       )
     ), // default = "servicos_gerais" (retroativo)
     ativo: v.boolean(),
@@ -69,7 +70,8 @@ export default defineSchema({
       v.array(
         v.union(
           v.literal("servicos_gerais"),
-          v.literal("informatica")
+          v.literal("informatica"),
+          v.literal("mecanica")
         )
       )
     ), // default = ["servicos_gerais"] se vazio (retroativo)
@@ -94,7 +96,8 @@ export default defineSchema({
     modalidade: v.optional(
       v.union(
         v.literal("servicos_gerais"),
-        v.literal("informatica")
+        v.literal("informatica"),
+        v.literal("mecanica")
       )
     ), // default = "servicos_gerais" (retroativo)
     status: v.union(

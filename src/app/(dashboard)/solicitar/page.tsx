@@ -56,7 +56,7 @@ function SolicitarPageContent() {
           {/* Modalidade - botões grandes ANTES do título */}
           <div className="form-group">
             <label>Modalidade *</label>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginTop: 4 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 10, marginTop: 4 }}>
               {MODALIDADES.map((m) => (
                 <button
                   key={m.value}
@@ -90,9 +90,12 @@ function SolicitarPageContent() {
               type="text"
               value={titulo}
               onChange={(e) => setTitulo(e.target.value)}
-              placeholder={modalidade === "informatica"
-                ? "Ex: Computador não liga, impressora travada, sem internet"
-                : "Ex: Cano com vazamento no banheiro, lâmpada queimada"
+              placeholder={
+                modalidade === "informatica"
+                  ? "Ex: Computador não liga, impressora travada, sem internet"
+                  : modalidade === "mecanica"
+                  ? "Ex: Viatura VTR-1234 com problema no motor, troca de óleo"
+                  : "Ex: Cano com vazamento no banheiro, lâmpada queimada"
               }
               required
             />
@@ -103,9 +106,12 @@ function SolicitarPageContent() {
               type="text"
               value={local}
               onChange={(e) => setLocal(e.target.value)}
-              placeholder={modalidade === "informatica"
-                ? "Ex: Sala da TI, computador 03 do 1º andar"
-                : "Ex: Banheiro 2º andar, Ala B, próximo ao expurgo"
+              placeholder={
+                modalidade === "informatica"
+                  ? "Ex: Sala da TI, computador 03 do 1º andar"
+                  : modalidade === "mecanica"
+                  ? "Ex: Pátio da oficina, viatura VTR-1234, sala da manutenção"
+                  : "Ex: Banheiro 2º andar, Ala B, próximo ao expurgo"
               }
               required
             />

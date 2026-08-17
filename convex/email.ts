@@ -10,6 +10,7 @@ const EMAIL_PASS = process.env.EMAIL_PASS || "";
 const EMAIL_FROM_NAME = process.env.EMAIL_FROM_NAME || "Manutenção CPI-7";
 const EMAIL_SG = process.env.EMAIL_SG || "cpi7logistica@policiamilitar.sp.gov.br";
 const EMAIL_TI = process.env.EMAIL_TI || "cpi7telematica@policiamilitar.sp.gov.br";
+const EMAIL_MEC = process.env.EMAIL_MEC || "cpi7oficina@policiamilitar.sp.gov.br";
 
 let transporter: any = null;
 function getTransporter() {
@@ -70,8 +71,10 @@ export const sendNovaSolicitacaoEmail = action({
     console.log("[email] servico encontrado, modalidade=", servico.modalidade);
 
     const modalidade = servico.modalidade ?? "servicos_gerais";
-    const emailDestino = modalidade === "informatica" ? EMAIL_TI : EMAIL_SG;
-    const prefixo = modalidade === "informatica" ? "[TI]" : "[SG]";
+    let emailDestino: string = EMAIL_SG;
+    let prefixo: string = "[SG]";
+    if (modalidade === "informatica") { emailDestino = EMAIL_TI; prefixo = "[TI]"; }
+    else if (modalidade === "mecanica") { emailDestino = EMAIL_MEC; prefixo = "[MEC]"; }
 
     let solNome = "Não identificado";
     let solSecao = "";

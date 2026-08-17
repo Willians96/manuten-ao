@@ -1,7 +1,7 @@
 "use client";
 import { createContext, useContext, useState, ReactNode, useEffect } from "react";
 
-export type Modalidade = "servicos_gerais" | "informatica";
+export type Modalidade = "servicos_gerais" | "informatica" | "mecanica";
 
 interface ModalidadeContextType {
   modalidade: Modalidade;
@@ -22,7 +22,7 @@ export function ModalidadeProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (typeof window === "undefined") return;
     const saved = localStorage.getItem(STORAGE_KEY);
-    if (saved === "informatica" || saved === "servicos_gerais") {
+    if (saved === "informatica" || saved === "servicos_gerais" || saved === "mecanica") {
       setModalidadeState(saved);
     }
   }, []);
@@ -46,4 +46,5 @@ export const useModalidade = () => useContext(ModalidadeContext);
 export const MODALIDADES = [
   { value: "servicos_gerais" as Modalidade, label: "🛠 Serviços Gerais", cor: "#003882" },
   { value: "informatica" as Modalidade, label: "💻 Informática", cor: "#7c3aed" },
+  { value: "mecanica" as Modalidade, label: "🔧 Mecânica", cor: "#dc2626" },
 ];

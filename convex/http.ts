@@ -641,6 +641,100 @@ const runMigration = httpAction(async (ctx, request) => {
     });
   }
 
+  if (name === "criarEquipesMecanica") {
+    // Cria 2 equipes de mecanica (se nao existirem): "Equipe A (Mecanica)" e "Equipe B (Mecanica)"
+    // Modalidade = "mecanica" (regime 12x36, mesmo do SG)
+    const allEquipes = await ctx.runQuery(api.mutations.listEquipesPublic, {});
+    const jaExistem = allEquipes.filter((e: any) => e.modalidade === "mecanica");
+    if (jaExistem.length >= 2) {
+      return new Response(JSON.stringify({ ok: true, skipped: true, msg: "Ja existem " + jaExistem.length + " equipes de mecanica", equipes: jaExistem }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+    const criadas: any[] = [];
+    for (const nome of ["Equipe A (Mecanica)", "Equipe B (Mecanica)"]) {
+      const jaTem = allEquipes.find((e: any) => e.nome === nome);
+      if (jaTem) { criadas.push(jaTem); continue; }
+      const result = await ctx.runMutation(api.mutations.criarEquipeAdminPublic, { nome, modalidade: "mecanica" });
+      criadas.push({ _id: result.equipeId, nome, modalidade: "mecanica" });
+    }
+    return new Response(JSON.stringify({ ok: true, criadas }), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+
+  if (name === "debugListarServicosPorRe") {
+    // DEBUG: dado um RE, simula o filtro que o listServicos aplica para esse tecnico
+    // Retorna: user, tecnico, todos os servicos do banco, e os que passariam o filtro
+    const { re } = migArgs || {};
+    if (!re) {
+      return new Response(JSON.stringify({ error: "re is required" }), {
+        status: 400,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+    const user = await ctx.runQuery(api.mutations.findUserByRePublicSafe, { re });
+    if (!user) {
+      return new Response(JSON.stringify({ error: "user nao encontrado com RE " + re }), {
+        status: 404,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+    const tecnico = await ctx.runQuery(api.mutations.findTecnicoByRePublic, { re });
+    const allServicos = await ctx.runQuery(api.mutations.listAllServicosPublic, {});
+
+    let filtrados: any[] = [];
+    let log: string[] = [];
+    if (!tecnico) {
+      log.push("Usuario nao tem registro na tabela tecnicos - listServicos retornaria []");
+    } else {
+      const tecModalidades = (tecnico.modalidades && tecnico.modalidades.length > 0) ? tecnico.modalidades : ["servicos_gerais"];
+      log.push("Tecnico: " + tecnico.graduacao + " " + tecnico.nomeDeGuerra + " | equipeId=" + tecnico.equipeId + " | modalidades=" + JSON.stringify(tecModalidades));
+      for (const s of allServicos) {
+        const sModalidade = s.modalidade ?? "servicos_gerais";
+        const passaModalidade = tecModalidades.includes(sModalidade);
+        const ehPausado = s.status === "pausado";
+        const ehAguardandoOuAndamento = (s.status === "aprovado" || s.status === "em_andamento");
+        const mesmaEquipe = s.equipeId === tecnico.equipeId;
+        const passa = passaModalidade && (ehPausado || (ehAguardandoOuAndamento && mesmaEquipe));
+        if (passa) {
+          filtrados.push({ _id: s._id, titulo: s.titulo, status: s.status, modalidade: sModalidade, equipeId: s.equipeId });
+        }
+      }
+      log.push("Total no banco: " + allServicos.length);
+      log.push("Total que passaria o filtro: " + filtrados.length);
+    }
+
+    return new Response(JSON.stringify({
+      user: { name: user.name, role: user.role, isAdminMaster: user.isAdminMaster },
+      tecnico: tecnico ? { _id: tecnico._id, graduacao: tecnico.graduacao, nomeDeGuerra: tecnico.nomeDeGuerra, equipeId: tecnico.equipeId, modalidades: tecnico.modalidades, ativo: tecnico.ativo } : null,
+      log,
+      totalBanco: allServicos.length,
+      totalFiltrado: filtrados.length,
+      servicosFiltrados: filtrados,
+    }, null, 2), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+
+  if (name === "listEquipesPorModalidade") {
+    // Lista todas as equipes agrupadas por modalidade (util pro debug/UI)
+    const all = await ctx.runQuery(api.mutations.listEquipesPublic, {});
+    const porMod: Record<string, any[]> = { servicos_gerais: [], informatica: [], mecanica: [] };
+    for (const e of all) {
+      const m = e.modalidade ?? "servicos_gerais";
+      if (!porMod[m]) porMod[m] = [];
+      porMod[m].push({ _id: e._id, nome: e.nome, modalidade: e.modalidade ?? "servicos_gerais", ativo: e.ativo });
+    }
+    return new Response(JSON.stringify(porMod, null, 2), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+
   return new Response(JSON.stringify({ error: `migration '${name}' not found` }), {
     status: 404,
     headers: { "Content-Type": "application/json" },

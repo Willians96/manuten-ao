@@ -136,7 +136,7 @@ export function ehChamadoExtra(args: ExtraArgs): ExtraInfo {
 
   // Determina se e TI ou SG
   const mods = (tecnico.modalidades && tecnico.modalidades.length > 0) ? tecnico.modalidades : ["servicos_gerais"];
-  // Se modalidades inclui "informatica" -> TI; senao -> SG
+  // Se modalidades inclui "informatica" -> TI; senao -> SG/Mecanica (mesma regra 07-19, 12x36)
   const ehTI = mods.includes("informatica");
   const dentroExpediente = ehTI
     ? isDentroExpedienteTI(dow, ini.hora, ini.min)

@@ -149,7 +149,7 @@ export default function PendentePage() {
           </div>
 
           <div className="form-group">
-            <label>RE (Registro do Expediente)</label>
+            <label>RE (Registro Estatístico)</label>
             <input
               type="text"
               value={re}
