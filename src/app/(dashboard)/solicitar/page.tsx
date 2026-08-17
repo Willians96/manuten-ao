@@ -119,10 +119,10 @@ function SolicitarPageContent() {
           <div className="form-group">
             <label>Urgência *</label>
             <select value={urgencia} onChange={(e) => setUrgencia(e.target.value)} required>
-              <option value="baixa">Baixa — pode esperar alguns dias</option>
-              <option value="media">Média — necesita atenção breve</option>
-              <option value="alta">Alta — prejudica o funcionamento</option>
-              <option value="critica">Crítica — risco, segurança ou paralisação</option>
+              <option value="baixa">Baixa: Defeito leve. Não afeta a operação diária.</option>
+              <option value="media">Média: Falha parcial. Requer correção para evitar agravamento.</option>
+              <option value="alta">Alta: Falha grave. Prejudica a operação.</option>
+              <option value="critica">Crítica: Pane total. Risco de acidente ou paralisação.</option>
             </select>
           </div>
           <div className="form-group">

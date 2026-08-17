@@ -475,10 +475,10 @@ function GestorPageContent() {
                   value={editForm.urgencia}
                   onChange={(e) => setEditForm({ ...editForm, urgencia: e.target.value })}
                 >
-                  <option value="baixa">Baixa</option>
-                  <option value="media">Média</option>
-                  <option value="alta">Alta</option>
-                  <option value="critica">Crítica</option>
+                  <option value="baixa">Baixa: Defeito leve</option>
+                  <option value="media">Média: Falha parcial</option>
+                  <option value="alta">Alta: Falha grave</option>
+                  <option value="critica">Crítica: Pane total</option>
                 </select>
               </div>
               <div className="form-group">

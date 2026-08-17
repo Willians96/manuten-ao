@@ -343,10 +343,10 @@ function TecnicoPageContent() {
               <div className="form-group" style={{ margin: 0 }}>
                 <label>Urgência</label>
                 <select value={cr.urgencia} onChange={set("urgencia")} style={{ fontSize: 16, padding: "12px 14px" }}>
-                  <option value="baixa">Baixa</option>
-                  <option value="media">Média</option>
-                  <option value="alta">Alta</option>
-                  <option value="critica">Crítica</option>
+                  <option value="baixa">Baixa: Defeito leve</option>
+                  <option value="media">Média: Falha parcial</option>
+                  <option value="alta">Alta: Falha grave</option>
+                  <option value="critica">Crítica: Pane total</option>
                 </select>
               </div>
               <div className="form-group" style={{ margin: 0 }}>
