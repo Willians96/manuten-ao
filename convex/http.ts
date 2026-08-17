@@ -749,6 +749,30 @@ const runMigration = httpAction(async (ctx, request) => {
     });
   }
 
+  if (name === "debugListarTecnicos") {
+    // Lista TODOS os tecnicos com info do user (clerkId, RE, role, isAdminMaster)
+    // Util pra debug
+    const allTecs = await ctx.runQuery(api.mutations.listAllTecnicosPublic, {});
+    const lista = await Promise.all(allTecs.map(async (t: any) => {
+      const u = t.user;
+      return {
+        tecnicoId: t._id,
+        graduacao: t.graduacao,
+        nomeDeGuerra: t.nomeDeGuerra,
+        re: t.re,
+        ativo: t.ativo,
+        status: t.status,
+        modalidades: t.modalidades,
+        equipeId: t.equipeId,
+        user: u ? { _id: u._id, name: u.name, role: u.role, isAdminMaster: u.isAdminMaster, re: u.re } : null,
+      };
+    }));
+    return new Response(JSON.stringify({ total: lista.length, tecnicos: lista }, null, 2), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+
   if (name === "debugListarServicosPorRe") {
     // DEBUG: dado um RE, simula o filtro que o listServicos aplica para esse tecnico
     // Retorna: user, tecnico, todos os servicos do banco, e os que passariam o filtro
@@ -759,9 +783,16 @@ const runMigration = httpAction(async (ctx, request) => {
         headers: { "Content-Type": "application/json" },
       });
     }
-    const user = await ctx.runQuery(api.mutations.findUserByRePublicSafe, { re });
+    // Tenta achar o user pelo RE. Se nao achar, tenta achar via tecnico (pre-cadastrado)
+    let user: any = await ctx.runQuery(api.mutations.findUserByRePublicSafe, { re });
     if (!user) {
-      return new Response(JSON.stringify({ error: "user nao encontrado com RE " + re }), {
+      const tec = await ctx.runQuery(api.mutations.findTecnicoByRePublic, { re });
+      if (tec) {
+        user = await ctx.runQuery(api.mutations.findUserByIdPublic, { id: tec.userId });
+      }
+    }
+    if (!user) {
+      return new Response(JSON.stringify({ error: "user nao encontrado com RE " + re + " (e nem via tecnico)" }), {
         status: 404,
         headers: { "Content-Type": "application/json" },
       });

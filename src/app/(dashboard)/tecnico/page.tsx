@@ -4,6 +4,7 @@ import { api } from "../../../../convex/_generated/api";
 import { useState } from "react";
 import { RoleGuard } from "../../../components/RoleGuard";
 import { ehChamadoExtra } from "../../../lib/extra";
+import { useModalidade, MODALIDADES } from "../../../contexts/ModalidadeContext";
 
 export const dynamic = "force-dynamic";
 
@@ -44,7 +45,18 @@ function TecnicoPageContent() {
   const [showFolgaModal, setShowFolgaModal] = useState(false);
   const [motivoFolga, setMotivoFolga] = useState<"ferias"|"baixa"|"folga">("baixa");
   const [obsFolga, setObsFolga] = useState("");
-  const [filtroEquipe, setFiltroEquipe] = useState<string>("todas");
+  const { modalidade: minhaModalidade, setModalidade: setMinhaModalidade } = useModalidade();
+  const ehAdminMaster = (me as any)?.isAdminMaster === true;
+  const [filtroModalidade, setFiltroModalidade] = useState<string>(() => {
+    // Admin: padrao = "todas". Tecnico: padrao = modalidade dele
+    if (ehAdminMaster) return "todas";
+    return (tecnico?.modalidades && tecnico.modalidades.length > 0) ? tecnico.modalidades[0] : "servicos_gerais";
+  });
+  const [filtroEquipe, setFiltroEquipe] = useState<string>(() => {
+    // Admin: padrao = "todas". Tecnico: padrao = equipe dele (pra nao se perder no meio de todos)
+    if (ehAdminMaster) return "todas";
+    return tecnico?.equipeId || "todas";
+  });
 
   // Verifica se o tecnico esta em folga HOJE
   const emFolgaHoje = tecnico && tecnico.status && tecnico.status !== "ativo" && tecnico.statusDesde
@@ -58,10 +70,14 @@ function TecnicoPageContent() {
     dataInicioExec: "", dataFimExec: "",
   });
 
-  // Filtra servicos pela equipe selecionada (so faz efeito pra admin; tecnicos ja vem filtrado do servidor)
-  const servicosFiltrados = (servicos ?? []).filter((s: any) =>
-    filtroEquipe === "todas" ? true : s.equipeId === filtroEquipe
-  );
+  // Filtra servicos pela modalidade + equipe selecionada
+  // Tecnicos ja vem filtrados pelo servidor, mas admin master ve TUDO - ai o filtro client-side faz sentido
+  const servicosFiltrados = (servicos ?? []).filter((s: any) => {
+    if (filtroModalidade !== "todas" && (s.modalidade ?? "servicos_gerais") !== filtroModalidade) return false;
+    if (filtroEquipe === "todas") return true;
+    if (filtroEquipe === "minha") return tecnico && s.equipeId === tecnico.equipeId;
+    return s.equipeId === filtroEquipe;
+  });
 
   const emAndamento = servicosFiltrados.filter((s: any) => s.status === "em_andamento");
 
@@ -166,14 +182,26 @@ function TecnicoPageContent() {
 
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20, gap: 20, flexWrap: "wrap" }}>
         <h1 className="page-title" style={{ margin: 0 }}>🔧 Painel do Técnico</h1>
+        {ehAdminMaster && (
+          <div style={{ flexBasis: "100%", background: "#eff6ff", border: "1px solid #93c5fd", color: "#1e40af", padding: "8px 12px", borderRadius: 6, fontSize: 12, marginTop: 8 }}>
+            👑 <strong>Admin Master:</strong> você está vendo TODOS os serviços (sem filtro do servidor). Use os filtros acima pra restringir por modalidade + equipe.
+          </div>
+        )}
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
           {!emFolgaHoje && (
             <button className="btn btn-outline" onClick={() => setShowFolgaModal(true)} style={{ whiteSpace: "nowrap", borderColor: "#f59e0b", color: "#92400e" }}>
               🌴 Estou de folga hoje
             </button>
           )}
+          <select value={filtroModalidade} onChange={(e) => setFiltroModalidade(e.target.value)} style={{ padding: "6px 10px", borderRadius: 6, border: "1px solid #d1d5db", fontSize: 13, background: "#fff", color: "#374151" }} title="Filtrar servicos por modalidade">
+            <option value="todas">🔀 Todas modalidades</option>
+            {MODALIDADES.map((m) => (
+              <option key={m.value} value={m.value}>{m.label}</option>
+            ))}
+          </select>
           <select value={filtroEquipe} onChange={(e) => setFiltroEquipe(e.target.value)} style={{ padding: "6px 10px", borderRadius: 6, border: "1px solid #d1d5db", fontSize: 13, background: "#fff", color: "#374151" }} title="Filtrar servicos por equipe">
             <option value="todas">📋 Todas as equipes</option>
+            {tecnico && <option value="minha">👤 Minha equipe ({equipes?.find((e: any) => e._id === tecnico.equipeId)?.nome ?? "?"})</option>}
             {(equipes ?? []).map((eq: any) => (
               <option key={eq._id} value={eq._id}>👥 {eq.nome}</option>
             ))}
