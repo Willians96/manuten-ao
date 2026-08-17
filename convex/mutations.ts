@@ -1076,6 +1076,41 @@ export const cadastrarTecnicoAdminPublic = mutation({
   },
 });
 
+
+// Cria user placeholder (clerkId="pendente:RE") - usado em migrations pra
+// pré-cadastrar técnicos antes deles logarem
+export const insertPlaceholderUserPublic = mutation({
+  args: {
+    re: v.string(),
+    graduacao: v.string(),
+    nomeDeGuerra: v.string(),
+    nomeCompleto: v.optional(v.string()),
+    secao: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const clerkIdFake = "pendente:" + args.re;
+    // Verifica se ja existe
+    const existing = await ctx.db
+      .query("users")
+      .withIndex("by_clerkId", (q) => q.eq("clerkId", clerkIdFake))
+      .first();
+    if (existing) return { userId: existing._id, alreadyExisted: true };
+    const id = await ctx.db.insert("users", {
+      clerkId: clerkIdFake,
+      email: "pendente." + args.re.replace(/\D/g, "") + "@placeholder.pmesp",
+      name: args.nomeCompleto || args.nomeDeGuerra,
+      graduacao: args.graduacao,
+      nomeDeGuerra: args.nomeDeGuerra,
+      re: args.re,
+      secao: args.secao || "Mecanica",
+      role: "tecnico",
+      approved: true,
+      createdAt: Date.now(),
+    });
+    return { userId: id, alreadyExisted: false };
+  },
+});
+
 export const setEquipeModalidadePublic = mutation({
   args: { id: v.id("equipes"), modalidade: v.string() },
   handler: async (ctx, args) => {

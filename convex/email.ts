@@ -10,7 +10,7 @@ const EMAIL_PASS = process.env.EMAIL_PASS || "";
 const EMAIL_FROM_NAME = process.env.EMAIL_FROM_NAME || "Manutenção CPI-7";
 const EMAIL_SG = process.env.EMAIL_SG || "cpi7logistica@policiamilitar.sp.gov.br";
 const EMAIL_TI = process.env.EMAIL_TI || "cpi7telematica@policiamilitar.sp.gov.br";
-const EMAIL_MEC = process.env.EMAIL_MEC || "cpi7oficina@policiamilitar.sp.gov.br";
+const EMAIL_MEC = process.env.EMAIL_MEC || "cpi7subfrota@policiamilitar.sp.gov.br";
 
 let transporter: any = null;
 function getTransporter() {

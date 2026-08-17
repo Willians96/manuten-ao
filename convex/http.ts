@@ -665,6 +665,90 @@ const runMigration = httpAction(async (ctx, request) => {
     });
   }
 
+  if (name === "cadastrarMecanicos") {
+    // Migration: cria 2 equipes de mecanica (se nao existem) + cadastra 4 tecnicos placeholder
+    // Vincula cada tecnico a equipe de mecanica correspondente com modalidades=["mecanica"]
+    // Args opcional { forcar: true } pra recadastrar mesmo se ja existe
+    const forcar = !!(migArgs && migArgs.forcar);
+
+    // 1) Criar equipes de mecanica (se nao existem)
+    const allEquipes = await ctx.runQuery(api.mutations.listEquipesPublic, {});
+    const nomesEquipesMec = ["Equipe A (Mecanica)", "Equipe B (Mecanica)"];
+    const equipesMec: Record<string, any> = {};
+    for (const nome of nomesEquipesMec) {
+      let eq = allEquipes.find((e: any) => e.nome === nome);
+      if (!eq) {
+        const r = await ctx.runMutation(api.mutations.criarEquipeAdminPublic, { nome, modalidade: "mecanica" });
+        eq = { _id: r.equipeId, nome, modalidade: "mecanica" } as any;
+      } else if (eq.modalidade !== "mecanica") {
+        // Garante que a modalidade esta correta
+        await ctx.runMutation(api.mutations.setEquipeModalidadePublic, { id: eq._id, modalidade: "mecanica" });
+        eq.modalidade = "mecanica";
+      }
+      equipesMec[nome] = eq;
+    }
+
+    // 2) Cadastrar os 4 mecanicos
+    const mecanicos = [
+      { re: "133587-1", graduacao: "Cb", nomeDeGuerra: "Ramos",   secao: "Mecanica", equipe: "Equipe A (Mecanica)" },
+      { re: "124472-8", graduacao: "Cb", nomeDeGuerra: "Teles",   secao: "Mecanica", equipe: "Equipe A (Mecanica)" },
+      { re: "130602-2", graduacao: "Cb", nomeDeGuerra: "Joelson", secao: "Mecanica", equipe: "Equipe B (Mecanica)" },
+      { re: "211466-6", graduacao: "Cb", nomeDeGuerra: "Jesus",   secao: "Mecanica", equipe: "Equipe B (Mecanica)" },
+    ];
+
+    const resultados: any[] = [];
+    for (const m of mecanicos) {
+      // Acha/cria user placeholder
+      let user = await ctx.runQuery(api.mutations.findUserByRePublicSafe, { re: m.re });
+      let userId: any;
+      if (user) {
+        userId = user._id;
+        // Atualiza dados (caso tenha vindo de cadastro antigo)
+        if (user.graduacao !== m.graduacao || user.nomeDeGuerra !== m.nomeDeGuerra) {
+          await ctx.runMutation(api.mutations.insertPlaceholderUserPublic, {
+            re: m.re, graduacao: m.graduacao, nomeDeGuerra: m.nomeDeGuerra, secao: m.secao,
+          });
+        }
+      } else {
+        const r = await ctx.runMutation(api.mutations.insertPlaceholderUserPublic, {
+          re: m.re, graduacao: m.graduacao, nomeDeGuerra: m.nomeDeGuerra, secao: m.secao,
+        });
+        userId = r.userId;
+      }
+
+      // Verifica se ja e tecnico (nessa equipe OU em qualquer)
+      const tecExistente = await ctx.runQuery(api.mutations.findTecnicoByReAndEquipePublic, { re: m.re });
+      if (tecExistente && !forcar) {
+        resultados.push({ re: m.re, jaExistia: true, tecnicoId: tecExistente._id, equipe: m.equipe });
+        continue;
+      }
+      if (tecExistente && forcar) {
+        // Atualiza equipe + modalidades
+        const eq = equipesMec[m.equipe];
+        await ctx.runMutation(api.mutations.patchTecnicoEquipePublic, { id: tecExistente._id, equipeId: eq._id });
+        resultados.push({ re: m.re, atualizado: true, tecnicoId: tecExistente._id, equipe: m.equipe });
+        continue;
+      }
+
+      // Cria o tecnico
+      const eq = equipesMec[m.equipe];
+      const result = await ctx.runMutation(api.mutations.cadastrarTecnicoAdminPublic, {
+        userId,
+        equipeId: eq._id,
+        graduacao: m.graduacao,
+        nomeDeGuerra: m.nomeDeGuerra,
+        re: m.re,
+        modalidades: ["mecanica"],
+      });
+      resultados.push({ re: m.re, criado: true, tecnicoId: result.tecnicoId, equipe: m.equipe });
+    }
+
+    return new Response(JSON.stringify({ ok: true, equipes: equipesMec, mecanicos: resultados }, null, 2), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+
   if (name === "debugListarServicosPorRe") {
     // DEBUG: dado um RE, simula o filtro que o listServicos aplica para esse tecnico
     // Retorna: user, tecnico, todos os servicos do banco, e os que passariam o filtro
