@@ -1,7 +1,7 @@
 ﻿"use client";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "../../../../convex/_generated/api";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { RoleGuard } from "../../../components/RoleGuard";
 import { ehChamadoExtra } from "../../../lib/extra";
 import { useModalidade, MODALIDADES } from "../../../contexts/ModalidadeContext";
@@ -67,6 +67,24 @@ function TecnicoPageContent() {
     if (ehAdminMaster) return equipeTravada; // admin: pre-seleciona equipe dele
     return "todas"; // gestor: tudo
   });
+
+  // FIX: race condition no APK - useState initializer roda 1x no primeiro render
+  // Se me/tecnico ainda nao carregaram, o state fica com default errado e nunca atualiza
+  // Esses useEffect garantem que o state sincroniza quando os dados chegam
+  useEffect(() => {
+    // So aplica quando role ja carregou (tecnico ou admin)
+    if (!me) return; // me ainda nao chegou
+    if (filtrosTravados) {
+      // Tecnico: trava na modalidade+equipe dele
+      if (tecnico && modalidadeTravada) setFiltroModalidade(modalidadeTravada);
+      if (tecnico && equipeTravada) setFiltroEquipe(equipeTravada);
+    } else if (ehAdminMaster) {
+      // Admin: pre-seleciona com a dele
+      if (tecnico && modalidadeTravada) setFiltroModalidade(modalidadeTravada);
+      if (tecnico && equipeTravada) setFiltroEquipe(equipeTravada);
+    }
+    // Gestor: deixa "todas" mesmo
+  }, [me, tecnico, filtrosTravados, ehAdminMaster, modalidadeTravada, equipeTravada]);
 
   // Verifica se o tecnico esta em folga HOJE
   const emFolgaHoje = tecnico && tecnico.status && tecnico.status !== "ativo" && tecnico.statusDesde

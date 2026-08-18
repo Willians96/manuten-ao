@@ -749,6 +749,18 @@ const runMigration = httpAction(async (ctx, request) => {
     });
   }
 
+  if (name === "debugListarUsers") {
+    // Lista todos os users (com clerkId, email, role, re)
+    const allUsers = await ctx.runQuery("users" as any, {}).catch(async () => {
+      // Tenta via query publica
+      return await ctx.runQuery(api.mutations.debugListUsers, {});
+    });
+    return new Response(JSON.stringify({ total: allUsers.length, users: allUsers }, null, 2), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+
   if (name === "debugListarTecnicos") {
     // Lista TODOS os tecnicos com info do user (clerkId, RE, role, isAdminMaster)
     // Util pra debug
