@@ -771,6 +771,54 @@ const runMigration = httpAction(async (ctx, request) => {
     return new Response(JSON.stringify({ ok: true, re, resultado: r }), { status: 200, headers: { "Content-Type": "application/json" } });
   }
 
+  if (name === "resetTecnicoParaPendente") {
+    // Deleta o user REAL vinculado ao tecnico e cria um NOVO placeholder pendente:RE
+    // Aí o tecnico pode logar de novo no Clerk (com email diferente se quiser) e o upsertUser
+    // converte o placeholder pra user real automaticamente
+    // Args: { re: string, graduacao?: string, nomeDeGuerra?: string, secao?: string }
+    const { re, graduacao = "Cb", nomeDeGuerra, secao = "Mecanica" } = migArgs || {};
+    if (!re) {
+      return new Response(JSON.stringify({ error: "re obrigatorio" }), { status: 400, headers: { "Content-Type": "application/json" } });
+    }
+    // 1) Acha o tecnico
+    const tec = await ctx.runQuery(api.mutations.findTecnicoByReAndEquipePublic, { re });
+    if (!tec) {
+      return new Response(JSON.stringify({ error: "tecnico nao encontrado com RE " + re }), { status: 404, headers: { "Content-Type": "application/json" } });
+    }
+    const oldUserId = tec.userId;
+    const oldUser = await ctx.runQuery(api.mutations.findUserByIdPublic, { id: oldUserId });
+    // 2) Verifica se o user tem servicos vinculados
+    const allServicos: any[] = await ctx.runQuery(api.mutations.listAllServicosPublic, {});
+    const servicosComoSolicitante = allServicos.filter((s: any) => s.solicitanteId === oldUserId);
+    const servicosComoTecnico = allServicos.filter((s: any) => s.tecnicoId === oldUserId);
+    if (servicosComoSolicitante.length > 0 || servicosComoTecnico.length > 0) {
+      return new Response(JSON.stringify({ error: "user tem servicos vinculados. Reatribua antes.", detalhes: { comoSolicitante: servicosComoSolicitante.length, comoTecnico: servicosComoTecnico.length } }), { status: 400, headers: { "Content-Type": "application/json" } });
+    }
+    // 3) NAO pode deletar admin master
+    if (oldUser?.isAdminMaster) {
+      return new Response(JSON.stringify({ error: "NAO pode resetar admin master" }), { status: 400, headers: { "Content-Type": "application/json" } });
+    }
+    // 4) Deleta o user antigo
+    if (oldUser) {
+      await ctx.runMutation(api.mutations.deleteUserByIdPublic, { id: oldUserId });
+    }
+    // 5) Cria novo placeholder
+    const newPh = await ctx.runMutation(api.mutations.insertPlaceholderUserPublic, {
+      re,
+      graduacao,
+      nomeDeGuerra: nomeDeGuerra || tec.nomeDeGuerra,
+      secao,
+    });
+    // 6) Atualiza o userId do tecnico pro novo placeholder
+    await ctx.runMutation(api.mutations.patchTecnicoUserIdPublic, { tecnicoId: tec._id, userId: newPh.userId });
+    return new Response(JSON.stringify({
+      ok: true,
+      re,
+      antes: { oldUserId, oldUserName: oldUser?.name, oldUserEmail: oldUser?.email },
+      depois: { newUserId: newPh.userId, newClerkId: "pendente:" + re },
+    }), { status: 200, headers: { "Content-Type": "application/json" } });
+  }
+
   if (name === "cleanupUserDuplicado") {
     // Deleta um user duplicado (user real) por ID, APENAS se:
     // 1. Tem clerkId que NAO eh "pendente:..." (ou seja, ja logou)
