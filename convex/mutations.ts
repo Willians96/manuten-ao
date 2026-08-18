@@ -533,6 +533,10 @@ export const updateUserRole = mutation({
     if (target.isAdminMaster && target._id !== user._id) {
       throw new Error("NÃ£o Ã© possÃ­vel alterar o Admin Master");
     }
+    // Promover pra "admin" exige Admin Master (qualquer outro sÃ³ pode virar gestor/tecnico/solicitante)
+    if (args.role === "admin" && !user.isAdminMaster) {
+      throw new Error("Apenas o Admin Master pode promover alguÃ©m a admin");
+    }
     const updates: any = { role: args.role };
     if (args.approved !== undefined) updates.approved = args.approved;
     await ctx.db.patch(args.userId, updates);

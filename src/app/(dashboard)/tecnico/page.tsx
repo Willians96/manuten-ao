@@ -46,16 +46,26 @@ function TecnicoPageContent() {
   const [motivoFolga, setMotivoFolga] = useState<"ferias"|"baixa"|"folga">("baixa");
   const [obsFolga, setObsFolga] = useState("");
   const { modalidade: minhaModalidade, setModalidade: setMinhaModalidade } = useModalidade();
-  const ehAdminMaster = (me as any)?.isAdminMaster === true;
+  const meuRole = (me as any)?.role;
+  const ehAdminMaster = meuRole === "admin" && (me as any)?.isAdminMaster === true;
+  const ehAdminOuGestor = meuRole === "admin" || meuRole === "gestor";
+  // Tecnico (nao admin nem gestor) tem filtros TRAVADOS
+  const filtrosTravados = meuRole === "tecnico";
+
+  // Modalidade travada = modalidades[0] do tecnico (SG/Mec/Inform)
+  // Equipe travada = equipeId do tecnico
+  const modalidadeTravada = (tecnico?.modalidades && tecnico.modalidades.length > 0) ? tecnico.modalidades[0] : "servicos_gerais";
+  const equipeTravada = tecnico?.equipeId || "";
+
   const [filtroModalidade, setFiltroModalidade] = useState<string>(() => {
-    // Admin: padrao = "todas". Tecnico: padrao = modalidade dele
-    if (ehAdminMaster) return "todas";
-    return (tecnico?.modalidades && tecnico.modalidades.length > 0) ? tecnico.modalidades[0] : "servicos_gerais";
+    if (filtrosTravados) return modalidadeTravada;
+    if (ehAdminMaster) return modalidadeTravada; // admin: pre-seleciona modalidade dele
+    return "todas"; // gestor: tudo
   });
   const [filtroEquipe, setFiltroEquipe] = useState<string>(() => {
-    // Admin: padrao = "todas". Tecnico: padrao = equipe dele (pra nao se perder no meio de todos)
-    if (ehAdminMaster) return "todas";
-    return tecnico?.equipeId || "todas";
+    if (filtrosTravados) return equipeTravada;
+    if (ehAdminMaster) return equipeTravada; // admin: pre-seleciona equipe dele
+    return "todas"; // gestor: tudo
   });
 
   // Verifica se o tecnico esta em folga HOJE
@@ -71,12 +81,15 @@ function TecnicoPageContent() {
   });
 
   // Filtra servicos pela modalidade + equipe selecionada
-  // Tecnicos ja vem filtrados pelo servidor, mas admin master ve TUDO - ai o filtro client-side faz sentido
+  // Tecnicos: filtro client-side FORCA a modalidade+equipe dele (defesa contra DevTools)
+  // Admin/Gestor: filtro livre
+  const modEfetiva = filtrosTravados ? modalidadeTravada : filtroModalidade;
+  const eqEfetiva = filtrosTravados ? equipeTravada : filtroEquipe;
   const servicosFiltrados = (servicos ?? []).filter((s: any) => {
-    if (filtroModalidade !== "todas" && (s.modalidade ?? "servicos_gerais") !== filtroModalidade) return false;
-    if (filtroEquipe === "todas") return true;
-    if (filtroEquipe === "minha") return tecnico && s.equipeId === tecnico.equipeId;
-    return s.equipeId === filtroEquipe;
+    if (modEfetiva && (s.modalidade ?? "servicos_gerais") !== modEfetiva) return false;
+    if (eqEfetiva === "todas") return true;
+    if (eqEfetiva === "minha") return tecnico && s.equipeId === tecnico.equipeId;
+    return s.equipeId === eqEfetiva;
   });
 
   const emAndamento = servicosFiltrados.filter((s: any) => s.status === "em_andamento");
@@ -184,7 +197,7 @@ function TecnicoPageContent() {
         <h1 className="page-title" style={{ margin: 0 }}>🔧 Painel do Técnico</h1>
         {ehAdminMaster && (
           <div style={{ flexBasis: "100%", background: "#eff6ff", border: "1px solid #93c5fd", color: "#1e40af", padding: "8px 12px", borderRadius: 6, fontSize: 12, marginTop: 8 }}>
-            👑 <strong>Admin Master:</strong> você está vendo TODOS os serviços (sem filtro do servidor). Use os filtros acima pra restringir por modalidade + equipe.
+            👑 <strong>Admin Master:</strong> você está vendo TODOS os serviços (sem filtro do servidor). Os filtros acima já vêm pré-selecionados com sua modalidade/equipe ({MODALIDADES.find((m) => m.value === modalidadeTravada)?.label} / {equipes?.find((e: any) => e._id === equipeTravada)?.nome ?? "?"}), mas você pode trocar pra ver outras.
           </div>
         )}
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
@@ -193,15 +206,15 @@ function TecnicoPageContent() {
               🌴 Estou de folga hoje
             </button>
           )}
-          <select value={filtroModalidade} onChange={(e) => setFiltroModalidade(e.target.value)} style={{ padding: "6px 10px", borderRadius: 6, border: "1px solid #d1d5db", fontSize: 13, background: "#fff", color: "#374151" }} title="Filtrar servicos por modalidade">
+          <select value={filtroModalidade} disabled={filtrosTravados} onChange={(e) => setFiltroModalidade(e.target.value)} style={{ padding: "6px 10px", borderRadius: 6, border: "1px solid #d1d5db", fontSize: 13, background: filtrosTravados ? "#f3f4f6" : "#fff", color: "#374151", cursor: filtrosTravados ? "not-allowed" : "pointer" }} title={filtrosTravados ? "🔒 Filtro travado — só admins/gestores podem ver outras modalidades" : "Filtrar servicos por modalidade"}>
             <option value="todas">🔀 Todas modalidades</option>
             {MODALIDADES.map((m) => (
               <option key={m.value} value={m.value}>{m.label}</option>
             ))}
           </select>
-          <select value={filtroEquipe} onChange={(e) => setFiltroEquipe(e.target.value)} style={{ padding: "6px 10px", borderRadius: 6, border: "1px solid #d1d5db", fontSize: 13, background: "#fff", color: "#374151" }} title="Filtrar servicos por equipe">
+          <select value={filtroEquipe} disabled={filtrosTravados} onChange={(e) => setFiltroEquipe(e.target.value)} style={{ padding: "6px 10px", borderRadius: 6, border: "1px solid #d1d5db", fontSize: 13, background: filtrosTravados ? "#f3f4f6" : "#fff", color: "#374151", cursor: filtrosTravados ? "not-allowed" : "pointer" }} title={filtrosTravados ? "🔒 Filtro travado — só admins/gestores podem ver outras equipes" : "Filtrar servicos por equipe"}>
             <option value="todas">📋 Todas as equipes</option>
-            {tecnico && <option value="minha">👤 Minha equipe ({equipes?.find((e: any) => e._id === tecnico.equipeId)?.nome ?? "?"})</option>}
+            {tecnico && !filtrosTravados && <option value="minha">👤 Minha equipe ({equipes?.find((e: any) => e._id === tecnico.equipeId)?.nome ?? "?"})</option>}
             {(equipes ?? []).map((eq: any) => (
               <option key={eq._id} value={eq._id}>👥 {eq.nome}</option>
             ))}
