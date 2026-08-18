@@ -1021,6 +1021,15 @@ export const patchServicoCamposPublic = mutation({
   },
 });
 
+// Deleta user por ID (usado pela cleanupUserDuplicado migration)
+export const deleteUserByIdPublic = mutation({
+  args: { id: v.id("users") },
+  handler: async (ctx, args) => {
+    await ctx.db.delete(args.id);
+    return { ok: true, deletedId: args.id };
+  },
+});
+
 // Patch modalidade do servico (usado pra migrations via httpAction)
 export const patchServicoModalidadePublic = mutation({
   args: {

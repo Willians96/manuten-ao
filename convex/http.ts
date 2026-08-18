@@ -761,6 +761,93 @@ const runMigration = httpAction(async (ctx, request) => {
     });
   }
 
+  if (name === "deletePlaceholdersByRe") {
+    // Migration: deleta todos os placeholders (clerkId="pendente:RE") de um RE especifico
+    const { re } = migArgs || {};
+    if (!re) {
+      return new Response(JSON.stringify({ error: "re obrigatorio" }), { status: 400, headers: { "Content-Type": "application/json" } });
+    }
+    const r = await ctx.runMutation(api.mutations.deletePlaceholderUsersByRePublic, { re });
+    return new Response(JSON.stringify({ ok: true, re, resultado: r }), { status: 200, headers: { "Content-Type": "application/json" } });
+  }
+
+  if (name === "cleanupUserDuplicado") {
+    // Deleta um user duplicado (user real) por ID, APENAS se:
+    // 1. Tem clerkId que NAO eh "pendente:..." (ou seja, ja logou)
+    // 2. Existe OUTRO user com o mesmo RE (pra garantir que eh duplicado mesmo)
+    // 3. Nenhum servico onde ele eh o criador (solicitanteId)
+    // 4. Nenhum servico onde ele eh o criador por cadastroDireto
+    // Args: { userId: string, dryRun?: boolean }
+    const { userId, dryRun = false } = migArgs || {};
+    if (!userId) {
+      return new Response(JSON.stringify({ error: "userId obrigatorio" }), { status: 400, headers: { "Content-Type": "application/json" } });
+    }
+    const user = await ctx.runQuery(api.mutations.findUserByIdPublic, { id: userId });
+    if (!user) {
+      return new Response(JSON.stringify({ error: "user nao encontrado" }), { status: 404, headers: { "Content-Type": "application/json" } });
+    }
+    if (user.clerkId?.startsWith("pendente:")) {
+      return new Response(JSON.stringify({ error: "user eh placeholder, use deletePlaceholderUsersByRePublic" }), { status: 400, headers: { "Content-Type": "application/json" } });
+    }
+    let outros: any[] = [];
+    if (user.re) {
+      const allUsers: any[] = await ctx.runQuery(api.mutations.debugListUsers, {});
+      outros = allUsers.filter((u: any) => u.re === user.re && u._id !== user._id);
+    }
+    if (outros.length === 0) {
+      return new Response(JSON.stringify({ error: "user NAO eh duplicado (outros com mesmo RE: 0). Cuidado ao deletar!" }), { status: 400, headers: { "Content-Type": "application/json" } });
+    }
+    const allServicos: any[] = await ctx.runQuery(api.mutations.listAllServicosPublic, {});
+    const servicosComoSolicitante = allServicos.filter((s: any) => s.solicitanteId === user._id);
+    const servicosComoTecnico = allServicos.filter((s: any) => s.tecnicoId === user._id);
+    if (servicosComoSolicitante.length > 0 || servicosComoTecnico.length > 0) {
+      return new Response(JSON.stringify({ error: "user tem servicos vinculados. Tem que reatribuir antes.", detalhes: { comoSolicitante: servicosComoSolicitante.length, comoTecnico: servicosComoTecnico.length } }), { status: 400, headers: { "Content-Type": "application/json" } });
+    }
+    if (user.isAdminMaster) {
+      return new Response(JSON.stringify({ error: "NAO pode deletar admin master" }), { status: 400, headers: { "Content-Type": "application/json" } });
+    }
+    if (dryRun) {
+      return new Response(JSON.stringify({ ok: true, dryRun: true, user: { _id: user._id, name: user.name, email: user.email, re: user.re, role: user.role }, outros }), { status: 200, headers: { "Content-Type": "application/json" } });
+    }
+    await ctx.runMutation(api.mutations.deleteUserByIdPublic, { id: user._id });
+    return new Response(JSON.stringify({ ok: true, deletado: { _id: user._id, name: user.name, email: user.email, re: user.re, role: user.role }, outros }), { status: 200, headers: { "Content-Type": "application/json" } });
+  }
+
+  if (name === "fixTecnicoUserLinkPublic") {
+    // Igual fixTecnicoUserLink (autenticado), mas roda via httpAction (sem precisar de Admin Master logado)
+    // Args: { re: string, dryRun?: boolean }
+    // 1. Acha o tecnico ativo com esse RE
+    // 2. Acha o user real (clerkId="user_...") com esse RE
+    // 3. Atualiza o userId do tecnico pro user real
+    // 4. Deleta os placeholders orfaos (clerkId="pendente:RE")
+    const { re, dryRun = false } = migArgs || {};
+    if (!re) {
+      return new Response(JSON.stringify({ error: "re obrigatorio" }), { status: 400, headers: { "Content-Type": "application/json" } });
+    }
+    // 1) Acha o tecnico
+    const tec = await ctx.runQuery(api.mutations.findTecnicoByReAndEquipePublic, { re });
+    if (!tec) {
+      return new Response(JSON.stringify({ error: "tecnico nao encontrado com RE " + re }), { status: 404, headers: { "Content-Type": "application/json" } });
+    }
+    // 2) Acha o user real
+    const realUser = await ctx.runQuery(api.mutations.findRealUserByRePublic, { re });
+    if (!realUser) {
+      return new Response(JSON.stringify({ error: "user real nao encontrado com RE " + re + " (ninguem logou com esse RE ainda?)" }), { status: 404, headers: { "Content-Type": "application/json" } });
+    }
+    const antes = { tecnicoUserId: tec.userId, tecnicoId: tec._id, tecnicoNome: tec.graduacao + " " + tec.nomeDeGuerra, realUserId: realUser._id, realUserName: realUser.name, realUserEmail: realUser.email, realUserClerkId: realUser.clerkId };
+    if (tec.userId === realUser._id) {
+      return new Response(JSON.stringify({ ok: true, msg: "ja esta vinculado", antes }), { status: 200, headers: { "Content-Type": "application/json" } });
+    }
+    if (dryRun) {
+      return new Response(JSON.stringify({ ok: true, dryRun: true, antes }), { status: 200, headers: { "Content-Type": "application/json" } });
+    }
+    // 3) Atualiza o userId do tecnico
+    await ctx.runMutation(api.mutations.patchTecnicoUserIdPublic, { tecnicoId: tec._id, userId: realUser._id });
+    // 4) Deleta placeholders orfaos
+    const delResult = await ctx.runMutation(api.mutations.deletePlaceholderUsersByRePublic, { re });
+    return new Response(JSON.stringify({ ok: true, antes, depois: { tecnicoUserId: realUser._id, placeholdersDeletados: delResult } }), { status: 200, headers: { "Content-Type": "application/json" } });
+  }
+
   if (name === "backfillModalidadeCadastroDireto") {
     // Migration: servicos sem modalidade ganham a modalidade da equipe
     // (apenas servicos com cadastroDireto=true e equipeId apontando pra uma equipe com modalidade)
