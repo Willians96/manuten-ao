@@ -1021,6 +1021,18 @@ export const patchServicoCamposPublic = mutation({
   },
 });
 
+// Patch modalidade do servico (usado pra migrations via httpAction)
+export const patchServicoModalidadePublic = mutation({
+  args: {
+    id: v.id("servicos"),
+    modalidade: v.union(v.literal("servicos_gerais"), v.literal("informatica"), v.literal("mecanica")),
+  },
+  handler: async (ctx, args) => {
+    await ctx.db.patch(args.id, { modalidade: args.modalidade, updatedAt: Date.now() });
+    return { ok: true };
+  },
+});
+
 export const patchServicoSolicitanteIdPublic = mutation({
   args: { id: v.id("servicos"), solicitanteId: v.id("users") },
   handler: async (ctx, args) => {
@@ -1752,13 +1764,18 @@ export const criarServicoDireto = mutation({
     const dataInicioNorm = parseData(args.dataInicioExec);
     const dataFimNorm = parseData(args.dataFimExec);
 
-    // Determina modalidade: SG (servicos_gerais) ou TI (informatica)
-    // baseado na equipe escolhida
+    // Determina modalidade baseado na equipe escolhida
+    // Default = servicos_gerais (retroativo pra servicos antigos)
     let modalidade: "servicos_gerais" | "informatica" | "mecanica" = "servicos_gerais";
     if (equipeIdFinal) {
       const equipeEscolhida = await ctx.db.get(equipeIdFinal);
-      if (equipeEscolhida && (equipeEscolhida as any).modalidade === "informatica") {
-        modalidade = "informatica";
+      if (equipeEscolhida && (equipeEscolhida as any).modalidade) {
+        // Equipes de mecanica ou informatica viram a modalidade correta
+        // SG fica como default (equipes antigas sem modalidade)
+        const modEquipe = (equipeEscolhida as any).modalidade;
+        if (modEquipe === "informatica" || modEquipe === "mecanica") {
+          modalidade = modEquipe;
+        }
       }
     }
     // Se admin passou modalidade no args, usa ela
@@ -1770,6 +1787,7 @@ export const criarServicoDireto = mutation({
       descricao: args.descricao,
       local: args.local,
       urgencia: args.urgencia,
+      modalidade: modalidade, // <-- PERSISTIR MODALIDADE (senao vira "servicos_gerais" default)
       status: status as any,
       equipeId: equipeIdFinal,
       tecnicoId: tecnicoIdFinal,
@@ -1781,8 +1799,8 @@ export const criarServicoDireto = mutation({
         re: args.solicitanteRe,
         secao: args.solicitanteSecao,
       },
-      dataInicioExec: args.dataInicioExec,
-      dataFimExec: args.dataFimExec,
+      dataInicioExec: dataInicioNorm,
+      dataFimExec: dataFimNorm,
       createdAt: Date.now(),
       updatedAt: Date.now(),
     });

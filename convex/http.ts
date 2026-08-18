@@ -761,6 +761,53 @@ const runMigration = httpAction(async (ctx, request) => {
     });
   }
 
+  if (name === "backfillModalidadeCadastroDireto") {
+    // Migration: servicos sem modalidade ganham a modalidade da equipe
+    // (apenas servicos com cadastroDireto=true e equipeId apontando pra uma equipe com modalidade)
+    const allServicos = await ctx.runQuery(api.mutations.listAllServicosPublic, {});
+    const allEquipes = await ctx.runQuery(api.mutations.listEquipesPublic, {});
+    const equipeModMap: Record<string, string> = {};
+    for (const eq of allEquipes) {
+      if (eq.modalidade) equipeModMap[eq._id] = eq.modalidade;
+    }
+    let atualizados = 0;
+    const detalhes: any[] = [];
+    for (const s of allServicos) {
+      if (s.modalidade) continue; // ja tem
+      if (!s.equipeId) continue; // sem equipe, nao da pra inferir
+      const mod = equipeModMap[s.equipeId];
+      if (!mod) continue; // equipe sem modalidade (SG legacy)
+      await ctx.runMutation(api.mutations.patchServicoModalidadePublic, { id: s._id, modalidade: mod as any });
+      atualizados++;
+      detalhes.push({ _id: s._id, titulo: s.titulo, novaModalidade: mod });
+    }
+    return new Response(JSON.stringify({ ok: true, atualizados, detalhes }, null, 2), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+
+  if (name === "debugListarServicosRecentes") {
+    // Lista os 10 servicos mais recentes com modalidade
+    const all = await ctx.runQuery(api.mutations.listAllServicosPublic, {});
+    const sorted = [...all].sort((a: any, b: any) => (b._creationTime || 0) - (a._creationTime || 0));
+    const top10 = sorted.slice(0, 10).map((s: any) => ({
+      _id: s._id,
+      titulo: s.titulo,
+      local: s.local,
+      modalidade: s.modalidade,
+      status: s.status,
+      equipeId: s.equipeId,
+      cadastroDireto: s.cadastroDireto,
+      dadosSolicitante: s.dadosSolicitante,
+      createdAt: s._creationTime,
+    }));
+    return new Response(JSON.stringify({ total: all.length, top10 }, null, 2), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+
   if (name === "debugListarTecnicos") {
     // Lista TODOS os tecnicos com info do user (clerkId, RE, role, isAdminMaster)
     // Util pra debug
