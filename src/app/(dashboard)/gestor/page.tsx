@@ -138,11 +138,6 @@ function GestorPageContent() {
     <div className="page-container">
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16, gap: 12, flexWrap: "wrap" }}>
         <h1 className="page-title" style={{ margin: 0 }}>📊 Dashboard — Gestão de Manutenção {isAdminMaster && <span style={{ fontSize: 14, marginLeft: 12, background: "#f6d700", color: "#003882", padding: "4px 10px", borderRadius: 12, fontWeight: 700 }}>👑 Admin Master</span>}</h1>
-        {minhaGestorModalidade && (
-          <div style={{ background: "#dbeafe", color: "#1e40af", padding: "6px 12px", borderRadius: 6, fontSize: 13, fontWeight: 600 }}>
-            👤 Gestor de: {MODALIDADES.find((m) => m.value === minhaGestorModalidade)?.label || minhaGestorModalidade}
-          </div>
-        )}
         <Link href="/gestor/relatorios" className="btn btn-primary" style={{ whiteSpace: "nowrap" }}>
           📈 Gerar Relatório
         </Link>
@@ -200,19 +195,14 @@ function GestorPageContent() {
         <select
           value={filtroModalidade}
           onChange={(e) => setFiltroModalidade(e.target.value)}
-          disabled={!souAdmin && !!minhaGestorModalidade}
           style={{
             padding: "5px 10px", borderRadius: 6, border: "1px solid #d1d5db", fontSize: 13,
-            background: !souAdmin && !!minhaGestorModalidade ? "#f3f4f6" : "#fff",
+            background: "#fff",
             color: "#374151",
-            cursor: !souAdmin && !!minhaGestorModalidade ? "not-allowed" : "pointer",
+            cursor: "pointer",
             fontWeight: 600,
           }}
-          title={
-            !souAdmin && !!minhaGestorModalidade
-              ? `🔒 Você é gestor de ${minhaGestorModalidade.replace("_", " ").replace("informatica", "Informática").replace("mecanica", "Mecânica")} (admin pode mudar em /gestor/aprovar)`
-              : "Filtrar por modalidade"
-          }
+          title="Filtrar por modalidade"
         >
           <option value="todas">🔀 Todas modalidades</option>
           {MODALIDADES.map((m) => (

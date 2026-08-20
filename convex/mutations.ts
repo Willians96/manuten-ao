@@ -232,12 +232,12 @@ export const listServicos = query({
     if (!user) return [];
 
     // Filtro por modalidade:
-    // - Se user (gestor OU admin) tem gestorModalidade definido, FORCA essa modalidade (ignora args.modalidade)
-    // - Senão, usa args.modalidade se passado
-    let modalidadeEfetiva: string | undefined = args.modalidade;
-    if ((user.role === "gestor" || user.role === "admin") && (user as any).gestorModalidade) {
-      modalidadeEfetiva = (user as any).gestorModalidade;
-    }
+    // - O servidor SEMPRE respeita args.modalidade (vindo da UI)
+    // - O default do dropdown eh decidido pela UI (no cliente):
+    //   - Se user tem gestorModalidade, pre-seleciona essa
+    //   - Senao, "todas"
+    // - Admin E gestor podem trocar livremente (nao trava)
+    const modalidadeEfetiva: string | undefined = args.modalidade;
 
     let q: any = ctx.db.query("servicos").order("desc");
     if (modalidadeEfetiva) {
@@ -332,15 +332,10 @@ export const dashboardStats = query({
     modalidade: v.optional(v.union(v.literal("servicos_gerais"), v.literal("informatica"), v.literal("mecanica"))),
   },
   handler: async (ctx, args) => {
-    // User (gestor OU admin) com gestorModalidade: FORCA filtro pela dele (ignora args)
-    const currentUserId = await getCurrentUserId(ctx);
-    let modalidadeEfetiva: string | undefined = args.modalidade;
-    if (currentUserId) {
-      const user = await ctx.db.query("users").withIndex("by_clerkId", (q) => q.eq("clerkId", currentUserId)).first();
-      if (user && (user.role === "gestor" || user.role === "admin") && (user as any).gestorModalidade) {
-        modalidadeEfetiva = (user as any).gestorModalidade;
-      }
-    }
+    // O servidor SEMPRE respeita args.modalidade (vindo da UI)
+    // O default do dropdown eh decidido pela UI (no cliente)
+    // Admin E gestor podem trocar livremente (nao trava)
+    const modalidadeEfetiva: string | undefined = args.modalidade;
     // Filtra por modalidade (se passada)
     let allEquipes = await ctx.db.query("equipes").collect();
     let allTecnicos = await ctx.db.query("tecnicos").collect();
