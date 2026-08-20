@@ -27,7 +27,10 @@ function GestorPageContent() {
   const [filtroModalidade, setFiltroModalidade] = useState<string>(() => {
     return minhaGestorModalidade || "todas";
   });
-  const stats = useQuery(api.mutations.dashboardStats, {});
+  // Stats: se filtroModalidade != "todas", filtra no servidor
+  const stats = useQuery(api.mutations.dashboardStats, {
+    ...(filtroModalidade !== "todas" ? { modalidade: filtroModalidade as any } : {}),
+  });
   const equipes = useQuery(api.mutations.listEquipes, {});
   const tecnicos = useQuery(api.mutations.listTecnicos, {});
   const feriados = useQuery(api.mutations.listFeriados, {}) ?? [];
