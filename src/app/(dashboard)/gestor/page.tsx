@@ -1,7 +1,8 @@
 ﻿"use client";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "../../../../convex/_generated/api";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useModalidade, MODALIDADES } from "../../../contexts/ModalidadeContext";
 import Link from "next/link";
 import { RoleGuard } from "../../../components/RoleGuard";
 import { ehChamadoExtra } from "../../../lib/extra";
@@ -17,13 +18,25 @@ export default function GestorPage() {
 }
 
 function GestorPageContent() {
+  const me = useQuery(api.mutations.me);
+  const meuRole = (me as any)?.role;
+  const minhaGestorModalidade = (me as any)?.gestorModalidade;
+  const souAdmin = meuRole === "admin";
+  // Filtro de modalidade: admin pode trocar, gestor fica travado na dele
+  const [filtroModalidade, setFiltroModalidade] = useState<string>(() => {
+    if (souAdmin) return "todas";
+    return minhaGestorModalidade || "todas";
+  });
   const stats = useQuery(api.mutations.dashboardStats, {});
-  const servicos = useQuery(api.mutations.listServicos, {});
   const equipes = useQuery(api.mutations.listEquipes, {});
   const tecnicos = useQuery(api.mutations.listTecnicos, {});
   const feriados = useQuery(api.mutations.listFeriados, {}) ?? [];
+  // Admin: pode filtrar por modalidade (dropdown funciona livremente)
+  // Gestor: servidor SEMPRE força a modalidade do gestor (mesmo se mandar outra, ignora)
+  const servicos = useQuery(api.mutations.listServicos, {
+    ...(souAdmin && filtroModalidade !== "todas" ? { modalidade: filtroModalidade as any } : {}),
+  });
   const folgasRetroativas = useQuery(api.mutations.listFolgasTecnico, {}) ?? [];
-  const me = useQuery(api.mutations.me);
   const atribuir = useMutation(api.mutations.atribuirServico);
   const excluir = useMutation(api.mutations.excluirServico);
   const cancelar = useMutation(api.mutations.cancelarServico);
@@ -49,7 +62,7 @@ function GestorPageContent() {
     }).length;
   })();
 
-  const [filtro, setFiltro] = useState("todos");
+  const [filtro, setFiltro] = useState("pendente");
   const [editS, setEditS] = useState<any>(null);
   const [editForm, setEditForm] = useState({
     titulo: "", descricao: "", local: "", urgencia: "media"
@@ -125,6 +138,11 @@ function GestorPageContent() {
     <div className="page-container">
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16, gap: 12, flexWrap: "wrap" }}>
         <h1 className="page-title" style={{ margin: 0 }}>📊 Dashboard — Gestão de Manutenção {isAdminMaster && <span style={{ fontSize: 14, marginLeft: 12, background: "#f6d700", color: "#003882", padding: "4px 10px", borderRadius: 12, fontWeight: 700 }}>👑 Admin Master</span>}</h1>
+        {minhaGestorModalidade && (
+          <div style={{ background: "#dbeafe", color: "#1e40af", padding: "6px 12px", borderRadius: 6, fontSize: 13, fontWeight: 600 }}>
+            👤 Gestor de: {MODALIDADES.find((m) => m.value === minhaGestorModalidade)?.label || minhaGestorModalidade}
+          </div>
+        )}
         <Link href="/gestor/relatorios" className="btn btn-primary" style={{ whiteSpace: "nowrap" }}>
           📈 Gerar Relatório
         </Link>
@@ -177,7 +195,31 @@ function GestorPageContent() {
       </div>
 
       {/* Filtros */}
-      <div style={{ display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap" }}>
+      <div style={{ display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap", alignItems: "center" }}>
+        {/* Dropdown de modalidade */}
+        <select
+          value={filtroModalidade}
+          onChange={(e) => setFiltroModalidade(e.target.value)}
+          disabled={!souAdmin && !!minhaGestorModalidade}
+          style={{
+            padding: "5px 10px", borderRadius: 6, border: "1px solid #d1d5db", fontSize: 13,
+            background: !souAdmin && !!minhaGestorModalidade ? "#f3f4f6" : "#fff",
+            color: "#374151",
+            cursor: !souAdmin && !!minhaGestorModalidade ? "not-allowed" : "pointer",
+            fontWeight: 600,
+          }}
+          title={
+            !souAdmin && !!minhaGestorModalidade
+              ? `🔒 Você é gestor de ${minhaGestorModalidade.replace("_", " ").replace("informatica", "Informática").replace("mecanica", "Mecânica")} (admin pode mudar em /gestor/aprovar)`
+              : "Filtrar por modalidade"
+          }
+        >
+          <option value="todas">🔀 Todas modalidades</option>
+          {MODALIDADES.map((m) => (
+            <option key={m.value} value={m.value}>{m.label}</option>
+          ))}
+        </select>
+        <span style={{ color: "#9ca3af", fontSize: 12 }}>|</span>
         {["todos","pendente","aprovado","em_andamento","pausado","concluido","cancelado"].map((f) => (
           <button
             key={f}

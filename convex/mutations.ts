@@ -200,6 +200,21 @@ export const me = query({
   },
 });
 
+// Query publica (sem auth) - retorna o gestorModalidade de um userId
+// Usado pela UI para saber o default do filtro
+export const getGestorModalidadeById = query({
+  args: { userId: v.id("users") },
+  handler: async (ctx, args) => {
+    const u = await ctx.db.get(args.userId);
+    if (!u) return null;
+    return {
+      _id: u._id,
+      role: u.role,
+      gestorModalidade: (u as any).gestorModalidade ?? null,
+    };
+  },
+});
+
 export const listServicos = query({
   args: {
     status: v.optional(v.string()),
@@ -216,12 +231,19 @@ export const listServicos = query({
 
     if (!user) return [];
 
-    // Filtro por modalidade (se passada, usa Ã­ndice; senÃ£o, filtra em memÃ³ria)
+    // Filtro por modalidade:
+    // - Se gestor tem gestorModalidade definido, FORCA essa modalidade (ignora args.modalidade)
+    // - Senão, usa args.modalidade se passado
+    let modalidadeEfetiva: string | undefined = args.modalidade;
+    if (user.role === "gestor" && user.gestorModalidade) {
+      modalidadeEfetiva = user.gestorModalidade;
+    }
+
     let q: any = ctx.db.query("servicos").order("desc");
-    if (args.modalidade) {
+    if (modalidadeEfetiva) {
       q = ctx.db
         .query("servicos")
-        .withIndex("by_modalidade", (q: any) => q.eq("modalidade", args.modalidade))
+        .withIndex("by_modalidade", (q: any) => q.eq("modalidade", modalidadeEfetiva))
         .order("desc");
     }
     if (args.status) {
@@ -1027,6 +1049,31 @@ export const deleteUserByIdPublic = mutation({
   handler: async (ctx, args) => {
     await ctx.db.delete(args.id);
     return { ok: true, deletedId: args.id };
+  },
+});
+
+// Seta a modalidade do gestor (admin master ou o proprio gestor pode usar)
+export const setGestorModalidadePublic = mutation({
+  args: {
+    userId: v.id("users"),
+    modalidade: v.union(
+      v.literal("servicos_gerais"),
+      v.literal("informatica"),
+      v.literal("mecanica")
+    ),
+  },
+  handler: async (ctx, args) => {
+    await ctx.db.patch(args.userId, { gestorModalidade: args.modalidade });
+    return { ok: true };
+  },
+});
+
+// Remove a modalidade do gestor (volta a ver todas)
+export const clearGestorModalidadePublic = mutation({
+  args: { userId: v.id("users") },
+  handler: async (ctx, args) => {
+    await ctx.db.patch(args.userId, { gestorModalidade: undefined });
+    return { ok: true };
   },
 });
 

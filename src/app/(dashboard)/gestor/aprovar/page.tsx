@@ -25,6 +25,7 @@ type User = {
   secao?: string;
   approved: boolean;
   isAdminMaster?: boolean;
+  gestorModalidade?: "servicos_gerais" | "informatica" | "mecanica";
 };
 
 function AprovarPageContent() {
@@ -35,6 +36,8 @@ function AprovarPageContent() {
   const updateRole = useMutation(api.mutations.updateUserRole);
   const deleteUserMutation = useMutation(api.mutations.deleteUser);
   const forceDeleteUserMutation = useMutation(api.mutations.forceDeleteUser);
+  const setGestorMod = useMutation(api.mutations.setGestorModalidadePublic as any);
+  const clearGestorMod = useMutation(api.mutations.clearGestorModalidadePublic as any);
 
   const isAdminMaster = me?.isAdminMaster === true;
 
@@ -78,6 +81,27 @@ function AprovarPageContent() {
     if (!confirm(`${acao.charAt(0).toUpperCase() + acao.slice(1)} o usuário ${user.nomeDeGuerra || user.name}?`)) return;
     try {
       await updateRole({ userId: user._id as any, role: user.role as any, approved: novoStatus });
+    } catch (e: any) {
+      alert("Erro: " + e.message);
+    }
+  }
+
+  // Modalidade de gestor (so faz sentido se role === "gestor")
+  const [editMod, setEditMod] = useState<Record<string, string>>({});
+  function setEditModVal(userId: string, mod: string) {
+    setEditMod((prev) => ({ ...prev, [userId]: mod }));
+  }
+  async function handleUpdateMod(userId: any) {
+    const mod = editMod[userId];
+    if (mod === undefined) return;
+    try {
+      if (mod === "") {
+        await clearGestorMod({ userId: userId as any });
+        alert("Modalidade removida - gestor verá todas as modalidades");
+      } else {
+        await setGestorMod({ userId: userId as any, modalidade: mod as any });
+        alert(`Modalidade atribuída: ${mod}`);
+      }
     } catch (e: any) {
       alert("Erro: " + e.message);
     }
@@ -254,6 +278,7 @@ function AprovarPageContent() {
                   <th>Nome Guerra</th>
                   <th>Seção</th>
                   <th>Role</th>
+                  <th style={{ minWidth: 220 }}>Modalidade (gestores)</th>
                   <th style={{ minWidth: 220 }}>Ações</th>
                 </tr>
               </thead>
@@ -302,6 +327,40 @@ function AprovarPageContent() {
                         )}
                       </td>
                       <td>
+                        {u.role === "gestor" && !u.isAdminMaster ? (
+                          <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
+                            <select
+                              value={editMod[u._id] ?? u.gestorModalidade ?? ""}
+                              onChange={(e) => setEditModVal(u._id as string, e.target.value)}
+                              disabled={!u.approved || !isAdminMaster}
+                              style={{ padding: "3px 6px", borderRadius: 4, border: "1px solid #e2e8f0", fontSize: 12 }}
+                              title={!isAdminMaster ? "Apenas Admin Master pode atribuir modalidade" : "Atribuir modalidade ao gestor"}
+                            >
+                              <option value="">🌐 Todas</option>
+                              <option value="servicos_gerais">🛠 Serviços Gerais</option>
+                              <option value="informatica">💻 Telemática</option>
+                              <option value="mecanica">🔧 Mecânica</option>
+                            </select>
+                            {isAdminMaster && editMod[u._id] !== undefined && editMod[u._id] !== (u.gestorModalidade ?? "") && (
+                              <button
+                                className="btn btn-success"
+                                style={{ fontSize: 11, padding: "4px 10px" }}
+                                onClick={() => handleUpdateMod(u._id as any)}
+                              >
+                                💾
+                              </button>
+                            )}
+                            {u.gestorModalidade && (
+                              <span style={{ fontSize: 10, color: "#166534", background: "#dcfce7", padding: "2px 6px", borderRadius: 3, fontWeight: 600 }}>
+                                ✓
+                              </span>
+                            )}
+                          </div>
+                        ) : (
+                          <span style={{ color: "#9ca3af", fontSize: 11 }}>—</span>
+                        )}
+                      </td>
+                      <td>
                         {!u.isAdminMaster && (
                           <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
                             {u.approved && editRole[u._id] && editRole[u._id] !== u.role && (
@@ -347,7 +406,7 @@ function AprovarPageContent() {
                 })}
                 {aprovadosFiltrados.length === 0 && (
                   <tr>
-                    <td colSpan={9} style={{ textAlign: "center", color: "#6b7280", padding: 24 }}>
+                    <td colSpan={10} style={{ textAlign: "center", color: "#6b7280", padding: 24 }}>
                       {busca ? "Nenhum aprovado encontrado com essa busca." : "Nenhum usuário aprovado ainda."}
                     </td>
                   </tr>

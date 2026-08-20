@@ -22,6 +22,16 @@ export default defineSchema({
     approved: v.boolean(), // false = aguardando aprovação do gestor
     isAdminMaster: v.optional(v.boolean()), // true só pro primeiro admin do sistema
     fcmToken: v.optional(v.string()), // token Firebase Cloud Messaging pra push
+    // Gestor de qual modalidade? So faz sentido se role === "gestor"
+    // Se null, gestor ve todas as modalidades
+    // Se "servicos_gerais" | "informatica" | "mecanica", gestor ve so da dele
+    gestorModalidade: v.optional(
+      v.union(
+        v.literal("servicos_gerais"),
+        v.literal("informatica"),
+        v.literal("mecanica")
+      )
+    ),
     createdAt: v.number(),
   })
     .index("by_clerkId", ["clerkId"])
