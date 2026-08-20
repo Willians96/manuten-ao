@@ -1640,7 +1640,10 @@ export const iniciarServico = mutation({
     }
 
     await ctx.db.patch(args.servicoId, {
-      tecnicoId: tecnico._id,
+      // Se o servico era "Ambos" (tecnicoId null), NAO seta o tecnicoId especifico
+      // (mantem null) - o relatorio mostra todos os tecnicos da equipe nesse caso
+      // Se ja tinha tecnicoId, esse eh o mesmo que ta iniciando (ja validamos acima)
+      tecnicoId: servico.tecnicoId ?? tecnico._id,
       status: "em_andamento",
       dataInicioExec: servico.dataInicioExec ?? new Date().toISOString(),
       updatedAt: Date.now(),
