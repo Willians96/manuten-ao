@@ -135,13 +135,13 @@ function RelatoriosPageContent() {
           return {
             titulo: s.titulo,
             data: dataRef,
-            // Se nao tem tecnicoId, mostra "Ambos" com os tecnicos ativos da equipe
+            // Se nao tem tecnicoId (servico atribuido a "Ambos"), mostra o nome da equipe
             tecnico: (() => {
               if (tec) return `${tec.graduacao} ${tec.nomeDeGuerra}`;
-              const tecnicosEquipe = (tecnicos ?? []).filter((t: any) => t.equipeId === s.equipeId && t.ativo !== false);
-              if (tecnicosEquipe.length === 0) return "—";
-              const nomes = tecnicosEquipe.map((t: any) => `${t.graduacao} ${t.nomeDeGuerra}`).join(" + ");
-              return "👥 " + nomes;
+              // Ambos: nome da equipe
+              const eqDoServico = (equipes ?? []).find((e: any) => e._id === s.equipeId);
+              if (eqDoServico) return `👥 ${eqDoServico.nome} (ambos)`;
+              return "—";
             })(),
             duracao,
             local: s.local,
