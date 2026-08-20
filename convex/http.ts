@@ -771,6 +771,25 @@ const runMigration = httpAction(async (ctx, request) => {
     return new Response(JSON.stringify({ ok: true, re, resultado: r }), { status: 200, headers: { "Content-Type": "application/json" } });
   }
 
+  if (name === "setGestorModalidade") {
+    // Wrapper pra setGestorModalidadePublic (mutation que NAO pode ser chamada de httpAction direto)
+    const { userId, modalidade } = migArgs || {};
+    if (!userId || !modalidade) {
+      return new Response(JSON.stringify({ error: "userId e modalidade sao obrigatorios" }), { status: 400, headers: { "Content-Type": "application/json" } });
+    }
+    const r = await ctx.runMutation(api.mutations.setGestorModalidadePublic, { userId, modalidade });
+    return new Response(JSON.stringify({ ok: true, r }), { status: 200, headers: { "Content-Type": "application/json" } });
+  }
+
+  if (name === "clearGestorModalidade") {
+    const { userId } = migArgs || {};
+    if (!userId) {
+      return new Response(JSON.stringify({ error: "userId obrigatorio" }), { status: 400, headers: { "Content-Type": "application/json" } });
+    }
+    const r = await ctx.runMutation(api.mutations.clearGestorModalidadePublic, { userId });
+    return new Response(JSON.stringify({ ok: true, r }), { status: 200, headers: { "Content-Type": "application/json" } });
+  }
+
   if (name === "resetTecnicoParaPendente") {
     // Deleta o user REAL vinculado ao tecnico e cria um NOVO placeholder pendente:RE
     // Aí o tecnico pode logar de novo no Clerk (com email diferente se quiser) e o upsertUser

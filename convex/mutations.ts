@@ -332,17 +332,26 @@ export const dashboardStats = query({
     modalidade: v.optional(v.union(v.literal("servicos_gerais"), v.literal("informatica"), v.literal("mecanica"))),
   },
   handler: async (ctx, args) => {
+    // Gestor com gestorModalidade: FORCA filtro pela dele (ignora args)
+    const currentUserId = await getCurrentUserId(ctx);
+    let modalidadeEfetiva: string | undefined = args.modalidade;
+    if (currentUserId) {
+      const user = await ctx.db.query("users").withIndex("by_clerkId", (q) => q.eq("clerkId", currentUserId)).first();
+      if (user?.role === "gestor" && (user as any).gestorModalidade) {
+        modalidadeEfetiva = (user as any).gestorModalidade;
+      }
+    }
     // Filtra por modalidade (se passada)
     let allEquipes = await ctx.db.query("equipes").collect();
     let allTecnicos = await ctx.db.query("tecnicos").collect();
-    if (args.modalidade) {
-      allEquipes = allEquipes.filter((e) => (e.modalidade ?? "servicos_gerais") === args.modalidade);
+    if (modalidadeEfetiva) {
+      allEquipes = allEquipes.filter((e) => (e.modalidade ?? "servicos_gerais") === modalidadeEfetiva);
       const equipeIdsFiltradas = new Set(allEquipes.map((e) => e._id));
       allTecnicos = allTecnicos.filter((t) => equipeIdsFiltradas.has(t.equipeId));
     }
     let allServicos = await ctx.db.query("servicos").collect();
-    if (args.modalidade) {
-      allServicos = allServicos.filter((s) => (s.modalidade ?? "servicos_gerais") === args.modalidade);
+    if (modalidadeEfetiva) {
+      allServicos = allServicos.filter((s) => (s.modalidade ?? "servicos_gerais") === modalidadeEfetiva);
     }
     const equipesFiltradas = allEquipes;
     const tecnicosFiltrados = allTecnicos;
