@@ -110,7 +110,7 @@ function SolicitarPageContent() {
                 modalidade === "informatica"
                   ? "Ex: Sala da TI, computador 03 do 1º andar"
                   : modalidade === "mecanica"
-                  ? "Ex: Pátio da oficina, viatura VTR-1234, sala da manutenção"
+                  ? "Ex: local onde a VTR se encontra"
                   : "Ex: Banheiro 2º andar, Ala B, próximo ao expurgo"
               }
               required
