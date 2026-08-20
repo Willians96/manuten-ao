@@ -235,7 +235,7 @@ function GestorPageContent() {
               <th>Local</th>
               <th>Urgência</th>
               <th>Equipe</th>
-              <th>Responsável</th>
+              <th>Assumido por</th>
               <th>Status</th>
               <th>Agendado / Início</th>
               <th>Ações</th>
