@@ -22,9 +22,9 @@ function GestorPageContent() {
   const meuRole = (me as any)?.role;
   const minhaGestorModalidade = (me as any)?.gestorModalidade;
   const souAdmin = meuRole === "admin";
-  // Filtro de modalidade: admin pode trocar, gestor fica travado na dele
+  // Filtro de modalidade: se o user (admin OU gestor) tem gestorModalidade,
+  // pre-seleciona a dele. Se nao tem, default = "todas"
   const [filtroModalidade, setFiltroModalidade] = useState<string>(() => {
-    if (souAdmin) return "todas";
     return minhaGestorModalidade || "todas";
   });
   const stats = useQuery(api.mutations.dashboardStats, {});

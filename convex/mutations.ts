@@ -232,11 +232,11 @@ export const listServicos = query({
     if (!user) return [];
 
     // Filtro por modalidade:
-    // - Se gestor tem gestorModalidade definido, FORCA essa modalidade (ignora args.modalidade)
+    // - Se user (gestor OU admin) tem gestorModalidade definido, FORCA essa modalidade (ignora args.modalidade)
     // - Senão, usa args.modalidade se passado
     let modalidadeEfetiva: string | undefined = args.modalidade;
-    if (user.role === "gestor" && user.gestorModalidade) {
-      modalidadeEfetiva = user.gestorModalidade;
+    if ((user.role === "gestor" || user.role === "admin") && (user as any).gestorModalidade) {
+      modalidadeEfetiva = (user as any).gestorModalidade;
     }
 
     let q: any = ctx.db.query("servicos").order("desc");
@@ -332,12 +332,12 @@ export const dashboardStats = query({
     modalidade: v.optional(v.union(v.literal("servicos_gerais"), v.literal("informatica"), v.literal("mecanica"))),
   },
   handler: async (ctx, args) => {
-    // Gestor com gestorModalidade: FORCA filtro pela dele (ignora args)
+    // User (gestor OU admin) com gestorModalidade: FORCA filtro pela dele (ignora args)
     const currentUserId = await getCurrentUserId(ctx);
     let modalidadeEfetiva: string | undefined = args.modalidade;
     if (currentUserId) {
       const user = await ctx.db.query("users").withIndex("by_clerkId", (q) => q.eq("clerkId", currentUserId)).first();
-      if (user?.role === "gestor" && (user as any).gestorModalidade) {
+      if (user && (user.role === "gestor" || user.role === "admin") && (user as any).gestorModalidade) {
         modalidadeEfetiva = (user as any).gestorModalidade;
       }
     }
