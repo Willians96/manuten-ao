@@ -941,6 +941,18 @@ const runMigration = httpAction(async (ctx, request) => {
     });
   }
 
+  if (name === "debugContarPorStatus") {
+    const all = await ctx.runQuery(api.mutations.listAllServicosPublic, {});
+    const counts: Record<string, number> = {};
+    for (const s of all) {
+      counts[s.status] = (counts[s.status] || 0) + 1;
+    }
+    return new Response(JSON.stringify({ total: all.length, porStatus: counts }, null, 2), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+
   if (name === "debugListarServicosRecentes") {
     // Lista os 10 servicos mais recentes com modalidade
     const all = await ctx.runQuery(api.mutations.listAllServicosPublic, {});
