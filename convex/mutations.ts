@@ -389,12 +389,14 @@ export const dashboardStats = query({
         ? Math.round(durations.reduce((a, b) => a + b, 0) / durations.length)
         : 0;
 
-    // Total = EXATAMENTE a soma dos 4 cards (pendente + em_andamento + pausado + concluido)
-    // Cancelados e aprovados NAO contam (aprovado eh servico ja atribuido mas nao iniciado)
+    // Total = soma dos 4 cards + aprovados
+    // Aprovados sao servicos ja atribuidos (demanda REAL, so esperando o tecnico iniciar)
+    // Cancelados NAO contam (servico desconsiderado pelo gestor)
     const totalCalculado = servicosFiltrados.filter((s) => s.status === "pendente").length
       + servicosFiltrados.filter((s) => s.status === "em_andamento").length
       + servicosFiltrados.filter((s) => s.status === "pausado").length
-      + servicosFiltrados.filter((s) => s.status === "concluido").length;
+      + servicosFiltrados.filter((s) => s.status === "concluido").length
+      + servicosFiltrados.filter((s) => s.status === "aprovado").length;
 
     return {
       total: totalCalculado,
